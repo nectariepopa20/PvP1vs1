@@ -1,0 +1,88 @@
+name: 1vs1
+main: com.gmail.Orscrider.PvP1vs1.PvP1vs1
+version: '1.7.1 #221'
+author: Orscrider
+dev-url: http://dev.bukkit.org/bukkit-plugins/pvp-1vs1/
+softdepend: [Vault]
+    
+commands:
+  1vs1: 
+    description: 1vs1 command
+    usage: /1vs1 <subcommand>
+    aliases: [1on1, 1v1]
+         
+permissions:
+  1vs1.*:
+    default: op
+    children:
+      1vs1.join: true
+      1vs1.leave: true
+      1vs1.info: true
+      1vs1.reload: true
+      1vs1.commandUse: true
+      1vs1.sign.create: true
+      1vs1.arena.add: true
+      1vs1.arena.del: true
+      1vs1.arena.setspawn1: true
+      1vs1.arena.setspawn2: true
+      1vs1.arena.list: true
+      1vs1.arena.enable: true
+      1vs1.arena.disable: true
+      1vs1.arena.setInv: true
+      1vs1.arena.setPrizes: true
+      1vs1.itemDrop: true
+      1vs1.itemPickUp: true
+      1vs1.blockPlace: true
+      1vs1.blockBreak: true
+      1vs1.teleport: true
+      1vs1.randomJoin: true
+      1vs1.arena.*: true
+      1vs1.top.*: true
+      1vs1.points.*: true
+      1vs1.notifyOnUpdate: true
+      1vs1.update: true
+      1vs1.commandBlacklist.bypass: true
+      1vs1.arenaSign.create: true
+      1vs1.duel: true
+      1vs1.duel.arena: true
+      1vs1.accept: true
+  1vs1.arena.*:
+    default: op
+    children:
+      1vs1.arena.add: true
+      1vs1.arena.del: true
+      1vs1.arena.setspawn1: true
+      1vs1.arena.setspawn2: true
+      1vs1.arena.list: true
+      1vs1.arena.enable: true
+      1vs1.arena.disable: true
+      1vs1.arena.setInv: true
+      1vs1.arena.setPrizes: true
+  1vs1.top.*:
+    default: op
+    children:
+      1vs1.top.ten: true
+      1vs1.top.arena: true
+  1vs1.points.*:
+    default: op
+    children:
+      1vs1.points.total: true
+      1vs1.points.arena: true
+      1vs1.points.otherPlayers: true
+      1vs1.points.otherPlayers.arena: true
+  1vs1.default:
+    default: true
+    children:
+      1vs1.randomJoin: true
+      1vs1.points.total: true
+      1vs1.points.arena: true
+      1vs1.join: true
+      1vs1.leave: true
+      1vs1.info: true
+      1vs1.arena.list: true
+      1vs1.duel: true
+      1vs1.duel.arena: true
+      1vs1.accept: true
+      1vs1.top.*: true
+      1vs1.stats: true
+      1vs1.stats.otherPlayers: true
