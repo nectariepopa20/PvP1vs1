@@ -3,7 +3,8 @@
 **Fork of the original [PvP 1vs1](https://dev.bukkit.org/projects/pvp-1vs1) plugin** (Bukkit/Spigot). The original source is not publicly available, so this repository contains source recovered from **PvP1vs1-1.7.1.jar** using [CFR](https://www.benf.org/other/cfr/) so the plugin can be modified and rebuilt.
 
 - **Original project:** https://dev.bukkit.org/projects/pvp-1vs1  
-- **Original author:** Orscrider
+- **Original author:** Orscrider  
+- **This fork:** https://github.com/nectariepopa20/PvP1vs1
 
 ## What was done
 
