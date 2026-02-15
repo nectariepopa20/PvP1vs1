@@ -20,15 +20,17 @@
 package com.gmail.Orscrider.PvP1vs1.arena;
 
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
-import com.gmail.Orscrider.PvP1vs1.arena.ArenaQueue;
 import com.gmail.Orscrider.PvP1vs1.arena.CountdownThread;
 import com.gmail.Orscrider.PvP1vs1.arena.TimeOut;
 import com.gmail.Orscrider.PvP1vs1.duel.DuelInvitation;
 import com.gmail.Orscrider.PvP1vs1.metrics.MetricsHandler;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
 import com.gmail.Orscrider.PvP1vs1.util.FireworkRandomizer;
+import com.gmail.Orscrider.PvP1vs1.util.LobbyLeaveItem;
 import com.gmail.Orscrider.PvP1vs1.util.Utils;
 import com.gmail.Orscrider.PvP1vs1.util.ValueContainer;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -48,8 +50,10 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 
 public class GameManager {
+    private static final int MAX_LOBBY_PLAYERS = 2;
+
     private PvP1vs1 pl;
-    private ArenaQueue queue = new ArenaQueue(this);
+    private final List<Player> lobbyPlayers = new ArrayList<>();
     private TimeOut timeOut = null;
     private arenaMode arenaStatus = arenaMode.NORMAL;
     private String arenaName;
@@ -69,29 +73,25 @@ public class GameManager {
     }
 
     public void joinArena(Player[] players) {
-        for (Player p : this.arenaPlayers = players) {
+        this.arenaPlayers = players;
+        for (Player p : this.arenaPlayers) {
             if (!p.isOnline()) {
                 this.pl.messageParser("yourOpponentLoggedOut", p == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0]);
-                this.queue.removePlayer(p);
                 this.reset();
                 return;
             }
-            if (!p.isDead()) continue;
-            this.pl.messageParser("yourOpponentIsDead", p == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0]);
-            this.pl.messageParser("youAreDead", p == this.arenaPlayers[0] ? this.arenaPlayers[0] : this.arenaPlayers[1]);
-            this.queue.removePlayer(p);
-            this.reset();
-            return;
+            if (p.isDead()) {
+                this.pl.messageParser("yourOpponentIsDead", p == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0]);
+                this.pl.messageParser("youAreDead", p == this.arenaPlayers[0] ? this.arenaPlayers[0] : this.arenaPlayers[1]);
+                this.reset();
+                return;
+            }
         }
+        this.lobbyPlayers.clear();
         this.totalRounds = this.getArenaConfig().getInt("rounds");
         this.setArenaStatus(arenaMode.PREPERATION_BEFORE_FIGHT);
         if (this.pl.getDuelManager().isChallenger(this.arenaPlayers[0].getName())) {
             this.pl.getDuelManager().removeDuelInvitation(this.pl.getDuelManager().getDuelInvitation(this.arenaPlayers[0].getName()));
-        }
-        for (Player p : this.arenaPlayers) {
-            this.queue.removeIndex(0);
-            ValueContainer valCont = new ValueContainer(p.getLocation(), p.getLevel(), p.getExp(), p.getInventory().getArmorContents(), p.getInventory().getContents(), p.getGameMode(), p.getFoodLevel(), p.getHealth(), p.getMaxHealth(), p.getActivePotionEffects());
-            this.valueContMap.put(p.getName(), valCont);
         }
         this.readyPlayers();
         List<String> commands = this.getArenaConfig().getStringList("commandsToRunAtStart");
@@ -214,45 +214,162 @@ public class GameManager {
         }
     }
 
+    /**
+     * Starts the lobby countdown when 2 players are in lobby, then teleports them to arena.
+     */
     public void startGame() {
-        if (this.queue.size() >= 2 && this.getArenaStatus() == arenaMode.NORMAL && this.checkForDuelPlayers()) {
-            if (this.getArenaConfig().getBoolean("countdown.beforeTeleport.enabled")) {
+        if (this.lobbyPlayers.size() >= MAX_LOBBY_PLAYERS && this.getArenaStatus() == arenaMode.LOBBY) {
+            boolean lobbyCountdown = this.getArenaConfig().getBoolean("countdown.lobby.enabled", this.getArenaConfig().getBoolean("countdown.beforeTeleport.enabled", true));
+            if (lobbyCountdown) {
                 CountdownThread thread = new CountdownThread(this.pl, this, CountdownThread.countdownType.BEFORE_TELEPORT);
                 thread.start();
             } else {
-                this.joinArena(this.queue.getNextArenaPlayers());
+                Player[] players = new Player[]{this.lobbyPlayers.get(0), this.lobbyPlayers.get(1)};
+                this.joinArena(players);
             }
         }
-    }
-
-    public boolean checkForDuelPlayers() {
-        if (this.pl.getDuelManager().isChallenger(this.queue.getPlayer(1).getName())) {
-            if (this.queue.size() >= 3) {
-                Player playerToMove = this.queue.getPlayer(0);
-                this.queue.removeIndex(0);
-                this.queue.add(playerToMove, 2);
-                return true;
-            }
-            return false;
-        }
-        return true;
     }
 
     public void removeDuelPartner(Player p) {
-        if (!this.getArenaStatus().equals((Object)arenaMode.PREPERATION_BEFORE_FIGHT) && this.pl.getDuelManager().getDuelInvitation(p.getName()) != null && this.pl.getDuelManager().getDuelInvitation(p.getName()).isAccepted()) {
+        if (!this.getArenaStatus().equals(arenaMode.PREPERATION_BEFORE_FIGHT)
+                && this.pl.getDuelManager().getDuelInvitation(p.getName()) != null
+                && this.pl.getDuelManager().getDuelInvitation(p.getName()).isAccepted()) {
             DuelInvitation di = this.pl.getDuelManager().getDuelInvitation(p.getName());
-            Player otherPlayer = Bukkit.getPlayer((String)(di.getChallenger() == p.getName() ? di.getChallenged() : di.getChallenger()));
+            String otherName = di.getChallenger().equals(p.getName()) ? di.getChallenged() : di.getChallenger();
+            Player otherPlayer = Bukkit.getPlayer(otherName);
             this.pl.getDuelManager().removeDuelInvitation(di);
-            this.queue.removePlayer(otherPlayer);
-            HashMap<String, String> replacements = new HashMap<String, String>();
-            replacements.put("{PLAYER}", p.getName());
-            this.pl.send1vs1Message("duelPartnerLeftQueue", otherPlayer, replacements);
+            if (otherPlayer != null && otherPlayer.isOnline() && this.lobbyPlayers.contains(otherPlayer)) {
+                HashMap<String, String> replacements = new HashMap<>();
+                replacements.put("{PLAYER}", p.getName());
+                this.pl.send1vs1Message("duelPartnerLeftLobby", otherPlayer, replacements);
+            }
         }
+    }
+
+    public boolean hasLobbySet() {
+        return this.getArenaConfig().getString("lobby.world") != null;
+    }
+
+    public Location getLobbyLocation() {
+        return new Location(
+                Bukkit.getWorld(this.getArenaConfig().getString("lobby.world", "world")),
+                this.getArenaConfig().getDouble("lobby.x"),
+                this.getArenaConfig().getDouble("lobby.y"),
+                this.getArenaConfig().getDouble("lobby.z"),
+                (float) this.getArenaConfig().getInt("lobby.yaw"),
+                (float) this.getArenaConfig().getInt("lobby.pitch")
+        );
+    }
+
+    /**
+     * Adds player to lobby: teleport, clear inv, give leave item, store previous state.
+     * Caller must check arena state and lobby space before calling.
+     */
+    public void joinLobby(Player p) {
+        if (this.lobbyPlayers.size() >= MAX_LOBBY_PLAYERS) {
+            return;
+        }
+        ValueContainer valCont = new ValueContainer(p.getLocation(), p.getLevel(), p.getExp(),
+                p.getInventory().getArmorContents(), p.getInventory().getContents(), p.getGameMode(),
+                p.getFoodLevel(), p.getHealth(), p.getMaxHealth(), p.getActivePotionEffects());
+        this.valueContMap.put(p.getName(), valCont);
+        this.lobbyPlayers.add(p);
+        this.setArenaStatus(arenaMode.LOBBY);
+
+        p.closeInventory();
+        if (p.isInsideVehicle()) {
+            p.leaveVehicle();
+        }
+        p.teleport(this.getLobbyLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+        p.getInventory().clear();
+        p.getInventory().setItem(LobbyLeaveItem.getLeaveItemSlot(), LobbyLeaveItem.create(this.pl));
+        p.updateInventory();
+        p.setGameMode(GameMode.ADVENTURE);
+        p.setFlying(false);
+    }
+
+    /**
+     * Removes player from lobby and restores them to previous location/state.
+     * Remaining players stay in lobby (e.g. when one leaves during countdown).
+     */
+    public void leaveLobby(Player p) {
+        if (!this.lobbyPlayers.contains(p)) {
+            return;
+        }
+        String leftName = p.getName();
+        this.lobbyPlayers.remove(p);
+        int countAfter = this.lobbyPlayers.size();
+        if (p.isOnline()) {
+            this.restorePlayer(p);
+        } else {
+            this.valueContMap.remove(p.getName());
+        }
+        if (this.lobbyPlayers.isEmpty()) {
+            this.setArenaStatus(arenaMode.NORMAL);
+        } else {
+            this.setArenaStatus(arenaMode.LOBBY);
+            this.broadcastPlayerLeftLobby(leftName, countAfter);
+        }
+    }
+
+    /** Called when player quits while in lobby; does not restore (player offline). */
+    public void removeFromLobbyOnQuit(Player p) {
+        if (!this.lobbyPlayers.contains(p)) {
+            return;
+        }
+        String leftName = p.getName();
+        this.lobbyPlayers.remove(p);
+        this.valueContMap.remove(p.getName());
+        int countAfter = this.lobbyPlayers.size();
+        if (this.lobbyPlayers.isEmpty()) {
+            this.setArenaStatus(arenaMode.NORMAL);
+        } else {
+            this.setArenaStatus(arenaMode.LOBBY);
+            this.broadcastPlayerLeftLobby(leftName, countAfter);
+        }
+    }
+
+    private void broadcastPlayerLeftLobby(String playerName, int countAfter) {
+        HashMap<String, String> replacements = new HashMap<>();
+        replacements.put("{PLAYER}", playerName);
+        replacements.put("{COUNT}", String.valueOf(countAfter));
+        replacements.put("{MAX}", String.valueOf(MAX_LOBBY_PLAYERS));
+        for (Player other : this.lobbyPlayers) {
+            if (other != null && other.isOnline()) {
+                this.pl.send1vs1Message("playerLeftLobby", other, replacements);
+            }
+        }
+    }
+
+    /** Sends "X has joined the game (n/2)" to all current lobby players (including the joiner). */
+    public void broadcastPlayerJoinedLobby(Player joiner) {
+        int count = this.lobbyPlayers.size();
+        HashMap<String, String> replacements = new HashMap<>();
+        replacements.put("{PLAYER}", joiner.getName());
+        replacements.put("{COUNT}", String.valueOf(count));
+        replacements.put("{MAX}", String.valueOf(MAX_LOBBY_PLAYERS));
+        for (Player other : this.lobbyPlayers) {
+            if (other != null && other.isOnline()) {
+                this.pl.send1vs1Message("playerJoinedLobby", other, replacements);
+            }
+        }
+    }
+
+    public boolean isInLobby(Player p) {
+        return this.lobbyPlayers.contains(p);
+    }
+
+    public List<Player> getLobbyPlayers() {
+        return new ArrayList<>(this.lobbyPlayers);
+    }
+
+    public int getLobbySize() {
+        return this.lobbyPlayers.size();
     }
 
     public void spawnFirework(Location loc) {
         Random r = new Random();
-        Firework fw = (Firework)loc.getWorld().spawnEntity(loc, EntityType.FIREWORK);
+        Firework fw = (Firework)loc.getWorld().spawnEntity(loc, EntityType.FIREWORK_ROCKET);
         FireworkMeta fwm = fw.getFireworkMeta();
         fwm.addEffect(FireworkEffect.builder().with(FireworkRandomizer.fireworkType(r.nextInt(5))).withColor(FireworkRandomizer.fireworkColor(r.nextInt(17))).withColor(FireworkRandomizer.fireworkColor(r.nextInt(17))).withColor(FireworkRandomizer.fireworkColor(r.nextInt(17))).flicker(r.nextBoolean()).trail(r.nextBoolean()).withFade(FireworkRandomizer.fireworkColor(r.nextInt(17))).build());
         fwm.setPower(1);
@@ -268,11 +385,10 @@ public class GameManager {
     }
 
     public void reset() {
-        this.arenaStatus = arenaMode.NORMAL;
+        this.arenaStatus = this.lobbyPlayers.isEmpty() ? arenaMode.NORMAL : arenaMode.LOBBY;
         this.timeOut.resetTimeOut();
         this.arenaPlayers = new Player[2];
         this.playerRoundWins = new int[2];
-        this.startGame();
     }
 
     public boolean isGameOver(Player winner) {
@@ -348,10 +464,6 @@ public class GameManager {
         return this.arenaPlayers;
     }
 
-    public ArenaQueue getQueue() {
-        return this.queue;
-    }
-
     public void setArenaStatus(arenaMode mode) {
         this.arenaStatus = mode;
     }
@@ -362,20 +474,23 @@ public class GameManager {
 
     public String getArenaStatusInString() {
         switch (this.arenaStatus) {
-            case COUNTDOWN_BEFORE_TELEPORT: {
-                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.countdownBeforeTeleport");
-            }
-            case COUNTDOWN_BEFORE_FIGHT: {
+            case LOBBY:
+                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.lobby")
+                        .replace("{COUNT}", String.valueOf(this.lobbyPlayers.size()));
+            case COUNTDOWN_LOBBY:
+                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.countdownLobby");
+            case COUNTDOWN_BEFORE_FIGHT:
                 return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.countdownBeforeFight");
-            }
-            case FIGHT: {
-                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.fight").replace("{ROUND}", String.valueOf(this.getCurrentRound())).replace("{MAX_ROUNDS}", String.valueOf(this.totalRounds)).replace("{TIME_LEFT}", String.valueOf(this.timeOut.getTimeOut()));
-            }
-            case NORMAL: {
+            case FIGHT:
+                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.fight")
+                        .replace("{ROUND}", String.valueOf(this.getCurrentRound()))
+                        .replace("{MAX_ROUNDS}", String.valueOf(this.totalRounds))
+                        .replace("{TIME_LEFT}", String.valueOf(this.timeOut.getTimeOut()));
+            case NORMAL:
                 return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.normal");
-            }
+            default:
+                return "";
         }
-        return "";
     }
 
     public String getArenaName() {
@@ -426,12 +541,12 @@ public class GameManager {
 
     public static enum arenaMode {
         NORMAL,
-        COUNTDOWN_BEFORE_TELEPORT,
+        LOBBY,
+        COUNTDOWN_LOBBY,
         PREPERATION_BEFORE_FIGHT,
         COUNTDOWN_BEFORE_FIGHT,
         FIGHT,
-        BETWEEN_ROUNDS;
-
+        BETWEEN_ROUNDS
     }
 }
 

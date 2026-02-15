@@ -1,6 +1,7 @@
 name: 1vs1
 main: com.gmail.Orscrider.PvP1vs1.PvP1vs1
-version: '1.7.1 #221'
+version: '2.0.0'
+api-version: '1.21'
 author: Orscrider
 dev-url: http://dev.bukkit.org/bukkit-plugins/pvp-1vs1/
 softdepend: [Vault]
@@ -25,6 +26,7 @@ permissions:
       1vs1.arena.del: true
       1vs1.arena.setspawn1: true
       1vs1.arena.setspawn2: true
+      1vs1.arena.setlobby: true
       1vs1.arena.list: true
       1vs1.arena.enable: true
       1vs1.arena.disable: true
@@ -53,6 +55,7 @@ permissions:
       1vs1.arena.del: true
       1vs1.arena.setspawn1: true
       1vs1.arena.setspawn2: true
+      1vs1.arena.setlobby: true
       1vs1.arena.list: true
       1vs1.arena.enable: true
       1vs1.arena.disable: true

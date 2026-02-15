@@ -224,6 +224,16 @@ public class DataHandler {
         this.saveArenaConfig(arenaName);
     }
 
+    public void setLobbyInConfig(String arenaName, Location loc) {
+        this.getArenaConfig(arenaName).set("lobby.world", (Object)loc.getWorld().getName());
+        this.getArenaConfig(arenaName).set("lobby.x", (Object)loc.getX());
+        this.getArenaConfig(arenaName).set("lobby.y", (Object)loc.getY());
+        this.getArenaConfig(arenaName).set("lobby.z", (Object)loc.getZ());
+        this.getArenaConfig(arenaName).set("lobby.yaw", (Object)Float.valueOf(loc.getYaw()));
+        this.getArenaConfig(arenaName).set("lobby.pitch", (Object)Float.valueOf(loc.getPitch()));
+        this.saveArenaConfig(arenaName);
+    }
+
     public String getDatabaseType() {
         return this.getConfig().getString("database.type");
     }

@@ -14,7 +14,6 @@
 package com.gmail.Orscrider.PvP1vs1;
 
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
-import com.gmail.Orscrider.PvP1vs1.arena.ArenaQueue;
 import com.gmail.Orscrider.PvP1vs1.arena.GameManager;
 import com.gmail.Orscrider.PvP1vs1.duel.DuelInvitation;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
@@ -30,6 +29,7 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
@@ -441,6 +441,25 @@ implements CommandExecutor {
                                     return true;
                                 }
                             }
+                            if (args[1].equalsIgnoreCase("setlobby")) {
+                                if (!p.hasPermission("1vs1.arena.setlobby")) {
+                                    this.pl.messageParser("insufficientPermission", p);
+                                    return true;
+                                }
+                                if (args.length != 3) {
+                                    p.sendMessage(this.pl.getPrefix() + "\u00a7c/1vs1 arena setlobby <arena>");
+                                    return true;
+                                }
+                                if (!this.pl.getArenaManager().arenaExists(args[2])) {
+                                    this.replacements.put("{ARENA}", args[2]);
+                                    this.pl.send1vs1Message("arenaDoesNotExist", p, this.replacements);
+                                    return true;
+                                }
+                                this.pl.getDataHandler().setLobbyInConfig(args[2], p.getLocation());
+                                this.replacements.put("{ARENA}", args[2]);
+                                this.pl.send1vs1Message("setLobby", p, this.replacements);
+                                return true;
+                            }
                             if (args[1].equalsIgnoreCase("setInv") || args[1].equalsIgnoreCase("setInventory")) {
                                 if (!p.hasPermission("1vs1.arena.setInv")) {
                                     this.pl.messageParser("insufficientPermission", p);
@@ -590,16 +609,16 @@ implements CommandExecutor {
                     }
                     while (i$.hasNext()) {
                         Map.Entry<String, GameManager> arena4 = i$.next();
-                        if (arena4.getValue().getQueue().contains(p)) {
+                        if (arena4.getValue().isInLobby(p)) {
                             this.replacements.put("{ARENA}", arena4.getKey());
-                            this.pl.send1vs1Message("alreadyInQueue", p, this.replacements);
+                            this.pl.send1vs1Message("alreadyInLobby", p, this.replacements);
                             return true;
                         }
-                        if (!arena4.getValue().arenaPlayersContains(p)) continue;
-                        this.replacements.put("{ARENA}", arena4.getKey());
-                        this.replacements.put("{NUMBER}", String.valueOf(arena4.getValue().getQueue().indexOf(p)));
-                        this.pl.send1vs1Message("alreadyInArena", p, this.replacements);
-                        return true;
+                        if (arena4.getValue().arenaPlayersContains(p)) {
+                            this.replacements.put("{ARENA}", arena4.getKey());
+                            this.pl.send1vs1Message("alreadyInArena", p, this.replacements);
+                            return true;
+                        }
                     }
                     if (!this.pl.getArenaManager().arenaExists(args[1])) {
                         this.replacements.put("{ARENA}", args[1]);
@@ -607,32 +626,48 @@ implements CommandExecutor {
                         return true;
                     }
                     GameManager arena5 = this.pl.getArenaManager().getArena(args[1]);
-                    if (arena5.isEnabled()) {
-                        arena5.getQueue().add(p);
-                        this.replacements.put("{NUMBER}", String.valueOf(arena5.getQueue().size()));
-                        this.replacements.put("{ARENA}", arena5.getArenaName());
-                        this.pl.send1vs1Message("joinQueue", p, this.replacements);
-                        arena5.startGame();
+                    if (!arena5.isEnabled()) {
+                        this.replacements.put("{ARENA}", args[1]);
+                        this.pl.send1vs1Message("arenaDisabled", p, this.replacements);
                         return true;
                     }
-                    this.replacements.put("{ARENA}", args[1]);
-                    this.pl.send1vs1Message("arenaDisabled", p, this.replacements);
+                    if (!arena5.hasLobbySet()) {
+                        this.replacements.put("{ARENA}", args[1]);
+                        this.pl.send1vs1Message("arenaLobbyNotSet", p, this.replacements);
+                        return true;
+                    }
+                    GameManager.arenaMode status = arena5.getArenaStatus();
+                    if (status == GameManager.arenaMode.COUNTDOWN_LOBBY || status == GameManager.arenaMode.PREPERATION_BEFORE_FIGHT
+                            || status == GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT || status == GameManager.arenaMode.FIGHT
+                            || status == GameManager.arenaMode.BETWEEN_ROUNDS) {
+                        this.replacements.put("{ARENA}", args[1]);
+                        this.pl.send1vs1Message("arenaInGame", p, this.replacements);
+                        return true;
+                    }
+                    if (arena5.getLobbySize() >= 2) {
+                        this.replacements.put("{ARENA}", args[1]);
+                        this.pl.send1vs1Message("lobbyFull", p, this.replacements);
+                        return true;
+                    }
+                    arena5.joinLobby(p);
+                    arena5.broadcastPlayerJoinedLobby(p);
+                    this.replacements.put("{ARENA}", arena5.getArenaName());
+                    this.pl.send1vs1Message("joinLobby", p, this.replacements);
+                    arena5.startGame();
                     return true;
                 }
                 Iterator<Map.Entry<String, GameManager>> i$ = this.pl.getArenaManager().getArenas().entrySet().iterator();
-                do {
-                    if (!i$.hasNext()) {
-                        this.pl.messageParser("notInQueue", p);
+                while (i$.hasNext()) {
+                    arena = i$.next();
+                    if (arena.getValue().isInLobby(p)) {
+                        arena.getValue().leaveLobby(p);
+                        this.replacements.put("{ARENA}", arena.getKey());
+                        this.pl.send1vs1Message("leaveLobby", p, this.replacements);
+                        arena.getValue().removeDuelPartner(p);
                         return true;
                     }
-                    arena = i$.next();
-                    if (!arena.getValue().getQueue().nextArenaPlayersContainsPlayer(p) || arena.getValue().getArenaStatus() != GameManager.arenaMode.COUNTDOWN_BEFORE_TELEPORT) continue;
-                    this.pl.messageParser("cannotLeaveQueueNow", p);
-                    return true;
-                } while (!arena.getValue().getQueue().contains(p));
-                arena.getValue().getQueue().removePlayer(p);
-                this.replacements.put("{ARENA}", arena.getKey());
-                this.pl.send1vs1Message("leaveQueue", p, this.replacements);
+                }
+                this.pl.messageParser("notInLobby", p);
                 return true;
             }
             for (int i$ = 0; i$ < len$; ++i$) {
@@ -649,11 +684,34 @@ implements CommandExecutor {
             return true;
         }
         GameManager arena = this.pl.getArenaManager().getArena(args[1]);
-        ArenaQueue queue = arena.getQueue();
-        Iterator i$ = this.pl.getDataHandler().getMessagesConfig().getStringList("info").iterator();
-        while (i$.hasNext()) {
-            String line = (String)i$.next();
-            p.sendMessage(this.pl.getPrefix() + ChatColor.translateAlternateColorCodes((char)'&', (String)line).replace("{ENABLED}", String.valueOf(arena.isEnabled())).replace("{GAME_STATUS}", ChatColor.translateAlternateColorCodes((char)'&', (String)arena.getArenaStatusInString())).replace("{SIZE}", String.valueOf(arena.getQueue().size())).replace("{IN_QUEUE}", queue.contains(p) ? "Yes" : "No").replace("{NUMBER}", queue.contains(p) ? String.valueOf(queue.indexOf(p) + 1) : "Not in queue").replace("{ARENA_PLAYERS}", arena.getArenaStatus() == GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT || arena.getArenaStatus() == GameManager.arenaMode.FIGHT ? arena.getArenaPlayers()[0].getName() + ", " + arena.getArenaPlayers()[1].getName() : "Nobody").replace("{NEXT_ARENA_PLAYERS}", queue.getNextArenaPlayers() != null ? queue.getNextArenaPlayers()[0].getName() + ", " + queue.getNextArenaPlayers()[1].getName() : "Nobody"));
+        int lobbySize = arena.getLobbySize();
+        String arenaPlayersStr = "Nobody";
+        if (arena.getArenaStatus() == GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT || arena.getArenaStatus() == GameManager.arenaMode.FIGHT) {
+            Player[] ap = arena.getArenaPlayers();
+            if (ap != null && ap[0] != null && ap[1] != null) {
+                arenaPlayersStr = ap[0].getName() + ", " + ap[1].getName();
+            }
+        }
+        String lobbyPlayersStr = "Nobody";
+        if (lobbySize > 0) {
+            List<Player> lp = arena.getLobbyPlayers();
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < lp.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(lp.get(i).getName());
+            }
+            lobbyPlayersStr = sb.toString();
+        }
+        for (String line : this.pl.getDataHandler().getMessagesConfig().getStringList("info")) {
+            String msg = this.pl.getPrefix() + ChatColor.translateAlternateColorCodes('&', line)
+                    .replace("{ENABLED}", String.valueOf(arena.isEnabled()))
+                    .replace("{GAME_STATUS}", ChatColor.translateAlternateColorCodes('&', arena.getArenaStatusInString()))
+                    .replace("{SIZE}", String.valueOf(lobbySize))
+                    .replace("{IN_LOBBY}", arena.isInLobby(p) ? "Yes" : "No")
+                    .replace("{LOBBY_COUNT}", String.valueOf(lobbySize))
+                    .replace("{ARENA_PLAYERS}", arenaPlayersStr)
+                    .replace("{LOBBY_PLAYERS}", lobbyPlayersStr);
+            p.sendMessage(msg);
         }
         return true;
     }
@@ -692,6 +750,8 @@ implements CommandExecutor {
             p.sendMessage(ChatColor.DARK_GREEN + "   /1vs1 arena setspawn1 <arena>");
             p.sendMessage(ChatColor.GOLD + "-----------------------------------------");
             p.sendMessage(ChatColor.DARK_GREEN + "   /1vs1 arena setspawn2 <arena>");
+            p.sendMessage(ChatColor.GOLD + "-----------------------------------------");
+            p.sendMessage(ChatColor.DARK_GREEN + "   /1vs1 arena setlobby <arena>");
             p.sendMessage(ChatColor.GOLD + "-----------------------------------------");
             p.sendMessage(ChatColor.DARK_GREEN + "   /1vs1 arena enable <arena>");
             p.sendMessage(ChatColor.GOLD + "-----------------------------------------");

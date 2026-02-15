@@ -6,13 +6,6 @@ arenaSignUpdater:
 prefix: '&4[&6&l1vs1&4]&r '
 duelInvitationTimeOut: 60
 checkForUpdates: true
-queue:
-  kick:
-    wasHitByPlayer: true
-    hitPlayer: true
-  commandBlacklist:
-  - sg
-  - spleef
 database:
   type: 'sqlite'
   host: 'localhost'

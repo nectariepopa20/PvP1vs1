@@ -92,11 +92,11 @@ public class ArenaManager {
             arena.setEnabled(false);
             this.pl.getDataHandler().getArenaConfig(arenaName).set("enabled", (Object)false);
             this.pl.getDataHandler().saveArenaConfig(arenaName);
-            for (Player p : arena.getQueue().getList()) {
+            for (Player p : arena.getLobbyPlayers()) {
                 this.replacements.put("{ARENA}", arenaName);
                 this.pl.send1vs1Message("arenaWasDisabled", p, this.replacements);
+                arena.leaveLobby(p);
             }
-            arena.getQueue().clear();
             for (Player p : arena.getArenaPlayers()) {
                 if (p == null) break;
                 this.replacements.put("{ARENA}", arenaName);
@@ -112,30 +112,21 @@ public class ArenaManager {
     }
 
     public String getRandomArena() {
-        if (this.getEnabledArenas().size() > 0) {
-            ArrayList<String> preferedQueues = new ArrayList<String>();
-            Random r = new Random();
-            for (Map.Entry<String, GameManager> arena : this.getEnabledArenas().entrySet()) {
-                if (arena.getValue().getQueue().size() != 1) continue;
-                preferedQueues.add(arena.getKey());
-            }
-            if (!preferedQueues.isEmpty()) {
-                return (String)preferedQueues.get(r.nextInt(preferedQueues.size()));
-            }
-            ArrayList<String> arenaNames = new ArrayList<String>(this.getEnabledArenas().keySet());
-            return arenaNames.get(r.nextInt(arenaNames.size()));
+        if (this.getEnabledArenas().isEmpty()) {
+            return null;
         }
-        return null;
+        ArrayList<String> arenaNames = new ArrayList<>(this.getEnabledArenas().keySet());
+        Random r = new Random();
+        return arenaNames.get(r.nextInt(arenaNames.size()));
     }
 
     public boolean isFree(Player p) {
-        boolean free = true;
         for (Map.Entry<String, GameManager> arena : this.arenas.entrySet()) {
-            if (!arena.getValue().arenaPlayersContains(p) && !arena.getValue().getQueue().contains(p)) continue;
-            free = false;
-            break;
+            if (arena.getValue().arenaPlayersContains(p) || arena.getValue().isInLobby(p)) {
+                return false;
+            }
         }
-        return free;
+        return true;
     }
 }
 

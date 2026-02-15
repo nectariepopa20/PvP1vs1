@@ -70,7 +70,7 @@ implements Listener {
                         if (!SignManager.this.isArenaSign(s) || !SignManager.this.isValidArena(ChatColor.stripColor((String)s.getLine(1)))) continue;
                         String arena = ChatColor.stripColor((String)s.getLine(1));
                         s.setLine(2, ChatColor.translateAlternateColorCodes((char)'&', (String)SignManager.this.pl.getArenaManager().getArena(arena).getArenaStatusInString()));
-                        s.setLine(3, SignManager.this.pl.getArenaManager().getArena(arena).getQueue().size() + " " + SignManager.this.pl.getDataHandler().getMessagesConfig().getString("sign.queued"));
+                        s.setLine(3, SignManager.this.pl.getArenaManager().getArena(arena).getLobbySize() + " " + SignManager.this.pl.getDataHandler().getMessagesConfig().getString("sign.inLobby"));
                         s.update();
                         continue;
                     }
@@ -97,13 +97,18 @@ implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent ev) {
-        if (ev.getAction() == Action.RIGHT_CLICK_BLOCK && ev.getClickedBlock().getState() instanceof Sign) {
+        if (ev.getAction() == Action.RIGHT_CLICK_BLOCK && ev.getClickedBlock() != null && ev.getClickedBlock().getState() instanceof Sign) {
             Sign sign = (Sign)ev.getClickedBlock().getState();
-            if (sign.getLine(1).equals("\u00a74[\u00a76\u00a7l1vs1\u00a74]")) {
-                ev.getPlayer().chat("/1vs1 " + ChatColor.stripColor((String)(sign.getLine(2) + ChatColor.stripColor((String)sign.getLine(3)))));
-            }
-            if (this.isArenaSign(sign)) {
-                ev.getPlayer().chat("/1vs1 join " + ChatColor.stripColor((String)sign.getLine(1)));
+            boolean is1vs1CommandSign = sign.getLine(1).equals("\u00a74[\u00a76\u00a7l1vs1\u00a74]");
+            boolean isArenaSign = this.isArenaSign(sign);
+            if (is1vs1CommandSign || isArenaSign) {
+                ev.setCancelled(true);
+                if (is1vs1CommandSign) {
+                    ev.getPlayer().chat("/1vs1 " + ChatColor.stripColor((String)(sign.getLine(2) + ChatColor.stripColor((String)sign.getLine(3)))));
+                }
+                if (isArenaSign) {
+                    ev.getPlayer().chat("/1vs1 join " + ChatColor.stripColor((String)sign.getLine(1)));
+                }
             }
         }
     }

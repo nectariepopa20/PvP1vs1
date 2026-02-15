@@ -74,12 +74,23 @@ extends JavaPlugin {
 
     public void onDisable() {
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            for (Player p : arena.getValue().getArenaPlayers()) {
+            GameManager gm = arena.getValue();
+            for (Player p : gm.getLobbyPlayers()) {
+                if (p != null && p.isOnline()) {
+                    HashMap<String, String> replacements = new HashMap<>();
+                    replacements.put("{ARENA}", arena.getKey());
+                    this.send1vs1Message("pluginWasDisabled", p, replacements);
+                    gm.leaveLobby(p);
+                }
+            }
+            for (Player p : gm.getArenaPlayers()) {
                 if (p == null) break;
-                HashMap<String, String> replacements = new HashMap<String, String>();
-                replacements.put("{ARENA}", arena.getKey());
-                this.send1vs1Message("pluginWasDisabled", p, replacements);
-                arena.getValue().restorePlayer(p);
+                if (p.isOnline()) {
+                    HashMap<String, String> replacements = new HashMap<>();
+                    replacements.put("{ARENA}", arena.getKey());
+                    this.send1vs1Message("pluginWasDisabled", p, replacements);
+                    gm.restorePlayer(p);
+                }
             }
         }
         this.dbController.disconnect();

@@ -40,8 +40,27 @@ implements Listener {
     public Updater(PvP1vs1 pl) {
         this.pl = pl;
         this.log = pl.getLogger();
-        this.currentBuildNumber = Integer.valueOf(pl.getDescription().getVersion().split("#")[1].trim());
+        String version = pl.getDescription().getVersion();
+        if (version != null && version.contains("#")) {
+            String[] parts = version.split("#");
+            this.currentBuildNumber = parts.length >= 2 ? Integer.parseInt(parts[1].trim()) : parseVersionToNumber(version);
+        } else {
+            this.currentBuildNumber = parseVersionToNumber(version);
+        }
         this.startUpdateChecker();
+    }
+
+    private int parseVersionToNumber(String version) {
+        if (version == null || version.isEmpty()) return 0;
+        try {
+            String[] parts = version.trim().split("\\.");
+            int major = parts.length > 0 ? Integer.parseInt(parts[0].replaceAll("[^0-9]", "")) : 0;
+            int minor = parts.length > 1 ? Integer.parseInt(parts[1].replaceAll("[^0-9]", "")) : 0;
+            int patch = parts.length > 2 ? Integer.parseInt(parts[2].replaceAll("[^0-9]", "")) : 0;
+            return major * 10000 + minor * 100 + patch;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     public void startUpdateChecker() {
@@ -90,9 +109,17 @@ implements Listener {
                 return this.currentBuildNumber;
             }
             JSONObject lastEntry = (JSONObject)array.get(array.size() - 1);
-            String newBuildNumber = ((String)lastEntry.get((Object)"name")).split("#")[1].trim();
+            String name = (String) lastEntry.get((Object)"name");
             this.downloadURL = ((String)lastEntry.get((Object)"downloadUrl")).replace("\\/", "/").trim();
-            return Integer.valueOf(newBuildNumber.replaceFirst("\\.", "").trim());
+            if (name != null && name.contains("#")) {
+                String[] parts = name.split("#");
+                if (parts.length >= 2) {
+                    try {
+                        return Integer.parseInt(parts[1].trim().replaceFirst("\\.", "").trim());
+                    } catch (NumberFormatException ignored) { }
+                }
+            }
+            return this.currentBuildNumber;
         }
         catch (IOException e) {
             e.printStackTrace();

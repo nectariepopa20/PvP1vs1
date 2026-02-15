@@ -41,57 +41,45 @@ extends Thread {
         block28: {
             block29: {
                 if (this.countdownMode != countdownType.BEFORE_TELEPORT) break block29;
-                this.gameManager.setArenaStatus(GameManager.arenaMode.COUNTDOWN_BEFORE_TELEPORT);
-                int duration = this.gameManager.getArenaConfig().getInt("countdown.beforeTeleport.duration");
-                Player[] players = this.gameManager.getQueue().getNextArenaPlayers();
+                this.gameManager.setArenaStatus(GameManager.arenaMode.COUNTDOWN_LOBBY);
+                org.bukkit.configuration.file.FileConfiguration cfg = this.gameManager.getArenaConfig();
+                int duration = cfg.getInt("countdown.lobby.duration", cfg.getInt("countdown.beforeTeleport.duration", 5));
+                java.util.List<Player> lobbyList = this.gameManager.getLobbyPlayers();
+                if (lobbyList.size() < 2) break block28;
+                Player[] players = new Player[]{lobbyList.get(0), lobbyList.get(1)};
                 for (int i = duration; i >= 0 && this.gameManager.isEnabled(); --i) {
+                    if (this.gameManager.getLobbyPlayers().size() < 2) break;
                     this.replacements.put("{COUNTDOWN}", String.valueOf(i));
                     if (i == duration) {
                         for (Player p : players) {
-                            this.pl.send1vs1Message("countdownBeforeTeleport", p, this.replacements);
-                            if (!this.gameManager.getArenaConfig().getBoolean("countdown.beforeTeleport.sound")) continue;
-                            this.playSound(p);
+                            if (p != null && p.isOnline()) {
+                                this.pl.send1vs1Message("countdownLobby", p, this.replacements);
+                                if (cfg.getBoolean("countdown.lobby.sound", cfg.getBoolean("countdown.beforeTeleport.sound", true))) this.playSound(p);
+                            }
                         }
-                        try {
-                            Thread.sleep(1000L);
-                        }
-                        catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                        try { Thread.sleep(1000L); } catch (InterruptedException e) { e.printStackTrace(); }
                         continue;
                     }
                     switch (i) {
-                        case 1: 
-                        case 2: 
-                        case 3: 
-                        case 4: 
-                        case 5: 
-                        case 10: 
-                        case 15: {
+                        case 1: case 2: case 3: case 4: case 5: case 10: case 15:
                             for (Player p : players) {
-                                this.pl.send1vs1Message("countdownBeforeTeleport", p, this.replacements);
-                                if (!this.gameManager.getArenaConfig().getBoolean("countdown.beforeTeleport.sound")) continue;
-                                this.playSound(p);
+                                if (p != null && p.isOnline()) {
+                                    this.pl.send1vs1Message("countdownLobby", p, this.replacements);
+                                    if (cfg.getBoolean("countdown.lobby.sound", cfg.getBoolean("countdown.beforeTeleport.sound", true))) this.playSound(p);
+                                }
                             }
                             break;
-                        }
-                        case 0: {
+                        case 0:
                             for (Player p : players) {
-                                this.pl.messageParser("getTeleportedIntoArena", p);
-                                if (!this.gameManager.getArenaConfig().getBoolean("countdown.beforeTeleport.sound")) continue;
-                                this.playSound(p);
+                                if (p != null && p.isOnline()) {
+                                    this.pl.messageParser("getTeleportedIntoArena", p);
+                                    if (cfg.getBoolean("countdown.lobby.sound", cfg.getBoolean("countdown.beforeTeleport.sound", true))) this.playSound(p);
+                                }
                             }
                             this.joinArena(players);
                             break;
-                        }
                     }
-                    try {
-                        Thread.sleep(1000L);
-                        continue;
-                    }
-                    catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                    try { Thread.sleep(1000L); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
                 break block28;
             }

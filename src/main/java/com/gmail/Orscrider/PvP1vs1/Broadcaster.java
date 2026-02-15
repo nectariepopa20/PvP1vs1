@@ -35,10 +35,12 @@ public class Broadcaster {
             public void run() {
                 for (Map.Entry<String, GameManager> entry : Broadcaster.this.arenaManager.getArenas().entrySet()) {
                     GameManager arena = entry.getValue();
-                    for (Player p : arena.getQueue().getList()) {
+                    java.util.List<Player> lobbyPlayers = arena.getLobbyPlayers();
+                    for (int i = 0; i < lobbyPlayers.size(); i++) {
+                        Player p = lobbyPlayers.get(i);
                         Broadcaster.this.replacements.put("{ARENA}", entry.getKey());
-                        Broadcaster.this.replacements.put("{NUMBER}", String.valueOf(arena.getQueue().indexOf(p) + 1));
-                        Broadcaster.this.pl.send1vs1Message("broadcastMessage", p, Broadcaster.this.replacements);
+                        Broadcaster.this.replacements.put("{COUNT}", String.valueOf(i + 1));
+                        Broadcaster.this.pl.send1vs1Message("broadcastLobbyMessage", p, Broadcaster.this.replacements);
                     }
                 }
             }

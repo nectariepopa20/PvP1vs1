@@ -1,5 +1,12 @@
 #dev.bukkit.org/server-mods/pvp-1vs1/pages/arena-configuration
 enabled: true
+lobby:
+  world: world
+  x: 0
+  y: 64
+  z: 0
+  yaw: 0
+  pitch: 0
 spawn1:
   world: world
   x: 0
@@ -24,7 +31,7 @@ prize:
     - ==: org.bukkit.inventory.ItemStack
       type: STONE_PICKAXE
 countdown:
-  beforeTeleport:
+  lobby:
     enabled: true
     duration: 5
     sound: true
@@ -52,7 +59,7 @@ commandsToRunAtStart:
 - ungod {PLAYER1}
 - ungod {PLAYER2}
 commandsToRunAtEnd:
-- give {WINNER} 367 1
+- give {WINNER} cooked_cod 1
 inventory:
   items:
   - ==: org.bukkit.inventory.ItemStack
