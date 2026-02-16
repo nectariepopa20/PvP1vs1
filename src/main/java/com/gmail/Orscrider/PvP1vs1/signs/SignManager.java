@@ -197,7 +197,7 @@ public class SignManager implements Listener {
                 ev.setLine(0, ChatColor.translateAlternateColorCodes('&', "&a[JOIN]"));
                 ev.setLine(1, ChatColor.translateAlternateColorCodes('&', "&l" + queueName));
                 ev.setLine(2, ChatColor.translateAlternateColorCodes('&', "&00 Playing"));
-                ev.setLine(3, ChatColor.translateAlternateColorCodes('&', "&a1vs1"));
+                ev.setLine(3, ChatColor.translateAlternateColorCodes('&', "&21vs1"));
                 Location loc = ev.getBlock().getLocation();
                 QueueSignData data = new QueueSignData(loc.getWorld().getName(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), queueName, "1v1");
                 queueSigns.add(data);
