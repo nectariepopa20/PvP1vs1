@@ -46,10 +46,43 @@ public class DmCommandHandler implements CommandExecutor {
                 return handleRandomJoin(p);
             case "info":
                 return handleInfo(p, args);
+            case "forcestart":
+                return handleForceStart(p);
             default:
                 sendDmHelp(p);
                 return true;
         }
+    }
+
+    private boolean handleForceStart(Player p) {
+        if (!p.hasPermission("dm.forcestart")) {
+            pl.messageParserDm("insufficientPermission", p);
+            return true;
+        }
+        DmGameManager arena = null;
+        for (DmGameManager a : pl.getDmArenaManager().getArenas().values()) {
+            if (a.isInLobby(p)) {
+                arena = a;
+                break;
+            }
+        }
+        if (arena == null) {
+            pl.messageParserDm("forceStartNotInLobby", p);
+            return true;
+        }
+        int lobbySize = arena.getLobbySize();
+        if (lobbySize < 2) {
+            pl.messageParserDm("forceStartNotEnoughPlayers", p);
+            return true;
+        }
+        if (!arena.forceStartGame()) {
+            pl.messageParserDm("forceStartNotEnoughPlayers", p);
+            return true;
+        }
+        replacements.put("{ARENA}", arena.getArenaName());
+        replacements.put("{COUNT}", String.valueOf(lobbySize));
+        pl.sendDmMessage("forceStartSuccess", p, replacements);
+        return true;
     }
 
     private boolean handleJoin(Player p, String[] args) {
@@ -454,6 +487,7 @@ public class DmCommandHandler implements CommandExecutor {
         p.sendMessage(ChatColor.GOLD + "========== Deathmatch ==========");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm join <arena>");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm leave");
+        p.sendMessage(ChatColor.DARK_GREEN + "  /dm forcestart");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm arena ...");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm rJoin  /dm info <arena>");
     }

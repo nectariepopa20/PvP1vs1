@@ -108,6 +108,7 @@ permissions:
       dm.arena.setInv: true
       dm.arena.enable: true
       dm.arena.disable: true
+      dm.forcestart: true
       dm.teleport: true
       dm.blockBreak: true
       dm.blockPlace: true

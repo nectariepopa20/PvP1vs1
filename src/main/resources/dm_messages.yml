@@ -24,6 +24,11 @@ winAnnounce: '&c{WINNER} &awon the deathmatch in arena &6{ARENA}'
 timeLeft: '&aTime left: &6{TIME_LEFT} &aseconds'
 timeOut: '&cThe battle took too long'
 
+# Force start
+forceStartSuccess: '&aArena &6{ARENA} &aforce-started with &6{COUNT} &aplayers.'
+forceStartNotInLobby: '&cYou must be in a DM arena lobby to force start.'
+forceStartNotEnoughPlayers: '&cNeed at least 2 players in lobby to force start.'
+
 # Permissions / errors
 insufficientPermission: '&cYou do not have permission to do this'
 arenaDoesNotExist: '&cThe arena &6{ARENA} &cdoes not exist'

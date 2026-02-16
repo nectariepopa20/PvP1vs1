@@ -172,6 +172,20 @@ public class DmGameManager {
         }
     }
 
+    /**
+     * Force start the game with current lobby players (requires at least 2).
+     * Caller should check player is in this arena's lobby.
+     * @return true if started, false if not enough players
+     */
+    public boolean forceStartGame() {
+        if (getArenaStatus() != DmArenaMode.LOBBY) return false;
+        if (lobbyPlayers.size() < 2) return false;
+        int take = Math.min(lobbyPlayers.size(), getMaxPlayers());
+        Player[] players = lobbyPlayers.subList(0, take).toArray(new Player[0]);
+        joinArena(players);
+        return true;
+    }
+
     public void joinArena(Player[] players) {
         arenaPlayers.clear();
         for (Player p : players) {
