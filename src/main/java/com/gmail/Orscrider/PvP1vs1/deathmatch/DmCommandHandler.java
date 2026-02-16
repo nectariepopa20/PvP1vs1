@@ -1,6 +1,8 @@
 package com.gmail.Orscrider.PvP1vs1.deathmatch;
 
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
+import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -8,6 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 
+import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,6 +49,8 @@ public class DmCommandHandler implements CommandExecutor {
                 return handleRandomJoin(p);
             case "info":
                 return handleInfo(p, args);
+            case "stats":
+                return handleStats(p, args);
             case "forcestart":
                 return handleForceStart(p);
             default:
@@ -169,6 +174,53 @@ public class DmCommandHandler implements CommandExecutor {
             return true;
         }
         pl.sendDmMessage("noEnabledArenas", p, replacements);
+        return true;
+    }
+
+    private boolean handleStats(Player p, String[] args) {
+        if (!p.hasPermission("dm.stats")) {
+            pl.messageParserDm("insufficientPermission", p);
+            return true;
+        }
+        DBConnectionController db = DBConnectionController.getInstance();
+        DecimalFormat oneDigit = new DecimalFormat("#,##0.0");
+        if (args.length == 1) {
+            int wins = db.getPlayerDmWins(p.getUniqueId().toString());
+            int kills = db.getPlayerDmKills(p.getUniqueId().toString());
+            int deaths = db.getPlayerDmDeaths(p.getUniqueId().toString());
+            double winRate = (wins + deaths == 0) ? 0 : (double) wins / (wins + deaths) * 100.0;
+            replacements.put("{DM_WINS}", String.valueOf(wins));
+            replacements.put("{DM_KILLS}", String.valueOf(kills));
+            replacements.put("{DM_DEATHS}", String.valueOf(deaths));
+            replacements.put("{DM_WIN_RATE}", oneDigit.format(winRate));
+            pl.sendDmMessage("stats", p, replacements);
+            return true;
+        }
+        if (args.length != 2) {
+            p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm stats [player]");
+            return true;
+        }
+        if (!p.hasPermission("dm.stats.otherPlayers")) {
+            pl.messageParserDm("insufficientPermission", p);
+            return true;
+        }
+        org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+        if (target == null || !target.hasPlayedBefore()) {
+            replacements.put("{NAME}", args[1]);
+            pl.sendDmMessage("statsPlayerNotFound", p, replacements);
+            return true;
+        }
+        String targetId = target.getUniqueId().toString();
+        int wins = db.getPlayerDmWins(targetId);
+        int kills = db.getPlayerDmKills(targetId);
+        int deaths = db.getPlayerDmDeaths(targetId);
+        double winRate = (wins + deaths == 0) ? 0 : (double) wins / (wins + deaths) * 100.0;
+        replacements.put("{NAME}", args[1]);
+        replacements.put("{DM_WINS}", String.valueOf(wins));
+        replacements.put("{DM_KILLS}", String.valueOf(kills));
+        replacements.put("{DM_DEATHS}", String.valueOf(deaths));
+        replacements.put("{DM_WIN_RATE}", oneDigit.format(winRate));
+        pl.sendDmMessage("statsOtherPlayers", p, replacements);
         return true;
     }
 
@@ -487,6 +539,7 @@ public class DmCommandHandler implements CommandExecutor {
         p.sendMessage(ChatColor.GOLD + "========== Deathmatch ==========");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm join <arena>");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm leave");
+        p.sendMessage(ChatColor.DARK_GREEN + "  /dm stats [player]");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm forcestart");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm arena ...");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm rJoin  /dm info <arena>");

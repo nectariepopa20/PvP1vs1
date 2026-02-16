@@ -1,10 +1,10 @@
 name: 1vs1
 main: com.gmail.Orscrider.PvP1vs1.PvP1vs1
-version: '2.1.0'
+version: '2.1.1'
 api-version: '1.21'
 author: Orscrider
 dev-url: http://dev.bukkit.org/bukkit-plugins/pvp-1vs1/
-softdepend: [Vault]
+softdepend: [Vault, PlaceholderAPI]
     
 commands:
   1vs1: 
@@ -114,6 +114,8 @@ permissions:
       dm.blockPlace: true
       dm.itemDrop: true
       dm.itemPickUp: true
+      dm.stats: true
+      dm.stats.otherPlayers: true
   dm.default:
     default: true
     children:
@@ -122,3 +124,5 @@ permissions:
       dm.info: true
       dm.arena.list: true
       dm.randomJoin: true
+      dm.stats: true
+      dm.stats.otherPlayers: true

@@ -57,6 +57,11 @@ itemDropInArena: '&cYou are not allowed to drop items in the arena'
 # Plugin
 pluginWasDisabled: '&aThe plugin was disabled'
 
+# Stats
+stats: '&aDM Stats: &2{DM_WINS}&a wins, &6{DM_KILLS}&a kills, &c{DM_DEATHS}&a deaths - &6{DM_WIN_RATE}% &awin rate'
+statsOtherPlayers: '&6{NAME}&a''s DM stats: &2{DM_WINS}&a wins, &6{DM_KILLS}&a kills, &c{DM_DEATHS}&a deaths - &6{DM_WIN_RATE}% &awin rate'
+statsPlayerNotFound: '&cPlayer &6{NAME} &cnot found.'
+
 # Info
 info:
 - '&aEnabled: &6{ENABLED}'

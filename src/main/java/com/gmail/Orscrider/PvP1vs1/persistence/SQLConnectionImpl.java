@@ -42,7 +42,7 @@ public class SQLConnectionImpl {
     }
 
     public void createTables() throws SQLException {
-        String playerTableCS = "CREATE TABLE players (playerid varchar(36) NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, PRIMARY KEY (playerid));";
+        String playerTableCS = "CREATE TABLE players (playerid varchar(36) NOT NULL, wins INTEGER NOT NULL, losses INTEGER NOT NULL, dmwins INTEGER NOT NULL DEFAULT 0, dmkills INTEGER NOT NULL DEFAULT 0, dmdeaths INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (playerid));";
         String playerArenaTableCS = "CREATE TABLE players_arenas (playerid varchar(36) NOT NULL, arenaid INTEGER(10) NOT NULL, score INTEGER(10) NOT NULL, PRIMARY KEY (playerid, arenaid));";
         String arenaTableCS = "CREATE TABLE arenas (arenaid INTEGER(10) NOT NULL, name varchar(100) NOT NULL, deleted INTEGER(1) NOT NULL, PRIMARY KEY (arenaid));";
         try {
@@ -429,6 +429,94 @@ public class SQLConnectionImpl {
         return losses;
     }
 
+    public void ensureDmStatsColumns() throws SQLException {
+        String[] columns = new String[]{"dmwins", "dmkills", "dmdeaths"};
+        for (String col : columns) {
+            try {
+                Statement st = this.connection.createStatement();
+                String sql = "ALTER TABLE players ADD COLUMN " + col + " INTEGER NOT NULL DEFAULT 0";
+                st.executeUpdate(sql);
+                st.close();
+            } catch (SQLException e) {
+                if (e.getMessage() == null || (!e.getMessage().toLowerCase().contains("duplicate") && !e.getMessage().toLowerCase().contains("already exists"))) {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    public boolean addPlayerDmWin(String playerId) throws SQLException {
+        ensurePlayerExistsForDm(playerId);
+        String sql = "UPDATE players SET dmwins = dmwins + 1 WHERE playerid = ?";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, playerId);
+            return ps.executeUpdate() != 0;
+        } finally {
+            if (ps != null) try { ps.close(); } catch (SQLException e) { LogHandler.severe("Error on closing prepared statement", e); }
+        }
+    }
+
+    public boolean addPlayerDmKill(String playerId) throws SQLException {
+        ensurePlayerExistsForDm(playerId);
+        String sql = "UPDATE players SET dmkills = dmkills + 1 WHERE playerid = ?";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, playerId);
+            return ps.executeUpdate() != 0;
+        } finally {
+            if (ps != null) try { ps.close(); } catch (SQLException e) { LogHandler.severe("Error on closing prepared statement", e); }
+        }
+    }
+
+    public boolean addPlayerDmDeath(String playerId) throws SQLException {
+        ensurePlayerExistsForDm(playerId);
+        String sql = "UPDATE players SET dmdeaths = dmdeaths + 1 WHERE playerid = ?";
+        PreparedStatement ps = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, playerId);
+            return ps.executeUpdate() != 0;
+        } finally {
+            if (ps != null) try { ps.close(); } catch (SQLException e) { LogHandler.severe("Error on closing prepared statement", e); }
+        }
+    }
+
+    public int getPlayerDmWins(String playerId) throws SQLException {
+        return getPlayerDmStat(playerId, "dmwins");
+    }
+
+    public int getPlayerDmKills(String playerId) throws SQLException {
+        return getPlayerDmStat(playerId, "dmkills");
+    }
+
+    public int getPlayerDmDeaths(String playerId) throws SQLException {
+        return getPlayerDmStat(playerId, "dmdeaths");
+    }
+
+    private void ensurePlayerExistsForDm(String playerId) throws SQLException {
+        if (!playerExists(playerId)) {
+            addPlayer(playerId);
+        }
+    }
+
+    private int getPlayerDmStat(String playerId, String column) throws SQLException {
+        String sql = "SELECT " + column + " FROM players WHERE playerid = ?";
+        PreparedStatement ps = null;
+        ResultSet result = null;
+        try {
+            ps = this.connection.prepareStatement(sql);
+            ps.setString(1, playerId);
+            result = ps.executeQuery();
+            return result.next() ? result.getInt(1) : 0;
+        } finally {
+            if (result != null) try { result.close(); } catch (SQLException e) { LogHandler.severe("Error on closing result set", e); }
+            if (ps != null) try { ps.close(); } catch (SQLException e) { LogHandler.severe("Error on closing prepared statement", e); }
+        }
+    }
+
     private boolean playerArenaExists(String playerId, String arenaName) throws SQLException {
         boolean playerArenaExists = false;
         String getPlayerArenaSQL = "SELECT 1 FROM players_arenas pa JOIN arenas a ON pa.arenaid = a.arenaid WHERE pa.playerid = ? AND a.name = ?";
@@ -505,7 +593,7 @@ public class SQLConnectionImpl {
     }
 
     private boolean addPlayer(String playerId) throws SQLException {
-        String addPlayerSQL = "INSERT INTO players (playerid, wins, losses) VALUES (?, 0, 0)";
+        String addPlayerSQL = "INSERT INTO players (playerid, wins, losses, dmwins, dmkills, dmdeaths) VALUES (?, 0, 0, 0, 0, 0)";
         PreparedStatement ps = null;
         int result = 0;
         try {

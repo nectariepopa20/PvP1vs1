@@ -1,6 +1,7 @@
 package com.gmail.Orscrider.PvP1vs1.deathmatch;
 
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
+import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
 import com.gmail.Orscrider.PvP1vs1.util.FireworkRandomizer;
 import com.gmail.Orscrider.PvP1vs1.util.LobbyLeaveItem;
 import com.gmail.Orscrider.PvP1vs1.util.ValueContainer;
@@ -254,7 +255,12 @@ public class DmGameManager {
     }
 
     public void onPlayerDeath(Player dead, Player killer) {
+        DBConnectionController db = DBConnectionController.getInstance();
+        if (dead != null) {
+            db.addPlayerDmDeath(dead.getUniqueId().toString());
+        }
         if (killer != null && killer != dead) {
+            db.addPlayerDmKill(killer.getUniqueId().toString());
             killCounts.merge(killer.getName(), 1, Integer::sum);
             HashMap<String, String> reps = new HashMap<>();
             reps.put("{X}", killer.getName());
@@ -332,6 +338,7 @@ public class DmGameManager {
         int totalSec = getArenaConfig().getInt("winningTimer", 10);
         int fireworkSec = Math.max(1, totalSec / 2);
         if (winner != null && winner.isOnline()) {
+            DBConnectionController.getInstance().addPlayerDmWin(winner.getUniqueId().toString());
             HashMap<String, String> replacements = new HashMap<>();
             replacements.put("{WINNER}", winner.getName());
             replacements.put("{ARENA}", arenaName);

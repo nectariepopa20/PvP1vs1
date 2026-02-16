@@ -53,6 +53,7 @@ public class DBConnectionController {
             if (!this.dbCon.dbTablesExists()) {
                 this.dbCon.createTables();
             }
+            this.dbCon.ensureDmStatsColumns();
         }
         catch (SQLException e) {
             LogHandler.severe("Error on checking/creating missing database tables", e);
@@ -235,6 +236,63 @@ public class DBConnectionController {
             LogHandler.severe("Error on getting count of losses of player", e);
         }
         return losses;
+    }
+
+    public void addPlayerDmWin(String playerId) {
+        try {
+            this.dbCon.addPlayerDmWin(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on updating DM wins of player", e);
+        }
+    }
+
+    public void addPlayerDmKill(String playerId) {
+        try {
+            this.dbCon.addPlayerDmKill(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on updating DM kills of player", e);
+        }
+    }
+
+    public void addPlayerDmDeath(String playerId) {
+        try {
+            this.dbCon.addPlayerDmDeath(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on updating DM deaths of player", e);
+        }
+    }
+
+    public int getPlayerDmWins(String playerId) {
+        try {
+            return this.dbCon.getPlayerDmWins(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on getting DM wins of player", e);
+            return 0;
+        }
+    }
+
+    public int getPlayerDmKills(String playerId) {
+        try {
+            return this.dbCon.getPlayerDmKills(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on getting DM kills of player", e);
+            return 0;
+        }
+    }
+
+    public int getPlayerDmDeaths(String playerId) {
+        try {
+            return this.dbCon.getPlayerDmDeaths(playerId);
+        }
+        catch (SQLException e) {
+            LogHandler.severe("Error on getting DM deaths of player", e);
+            return 0;
+        }
     }
 
     public int getScoreOfPlayer(String playerId) {

@@ -41,6 +41,20 @@ public interface DBConnectionInterface {
 
     public int getPlayerLosses(String var1) throws SQLException;
 
+    public void ensureDmStatsColumns() throws SQLException;
+
+    public boolean addPlayerDmWin(String var1) throws SQLException;
+
+    public boolean addPlayerDmKill(String var1) throws SQLException;
+
+    public boolean addPlayerDmDeath(String var1) throws SQLException;
+
+    public int getPlayerDmWins(String var1) throws SQLException;
+
+    public int getPlayerDmKills(String var1) throws SQLException;
+
+    public int getPlayerDmDeaths(String var1) throws SQLException;
+
     public LinkedHashMap<String, Integer> getPlayerTopTenList() throws SQLException;
 
     public LinkedHashMap<String, Integer> getPlayerTopTenListForArena(String var1) throws SQLException;

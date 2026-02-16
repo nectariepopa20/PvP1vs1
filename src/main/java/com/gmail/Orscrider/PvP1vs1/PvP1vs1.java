@@ -26,6 +26,7 @@ import com.gmail.Orscrider.PvP1vs1.duel.DuelManager;
 import com.gmail.Orscrider.PvP1vs1.metrics.MetricsHandler;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBMigrationHandler;
+import com.gmail.Orscrider.PvP1vs1.placeholders.PvP1vs1Placeholders;
 import com.gmail.Orscrider.PvP1vs1.signs.SignManager;
 import com.gmail.Orscrider.PvP1vs1.util.LogHandler;
 import com.gmail.Orscrider.PvP1vs1.util.Updater;
@@ -80,6 +81,10 @@ extends JavaPlugin {
             this.getServer().getPluginManager().registerEvents((Listener)this.updater, (Plugin)this);
         }
         metricsHandler.startMetrics();
+        if (this.getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new PvP1vs1Placeholders(this).register();
+            LogHandler.info("PlaceholderAPI expansion registered.");
+        }
         LogHandler.info("1vs1 enabled!");
     }
 
