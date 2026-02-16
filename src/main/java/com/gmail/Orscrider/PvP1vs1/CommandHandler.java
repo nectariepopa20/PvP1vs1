@@ -819,10 +819,6 @@ implements CommandExecutor {
                 }
                 return true;
             case "join":
-                if (!p.hasPermission("1vs1.queue.join")) {
-                    this.pl.messageParser("insufficientPermission", p);
-                    return true;
-                }
                 if (args.length != 3) {
                     p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue join <queue>");
                     return true;

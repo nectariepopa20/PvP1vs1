@@ -261,10 +261,6 @@ public class DmCommandHandler implements CommandExecutor {
                 }
                 return true;
             case "join":
-                if (!p.hasPermission("dm.queue.join")) {
-                    pl.messageParserDm("insufficientPermission", p);
-                    return true;
-                }
                 if (args.length != 3) {
                     p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue join <queue>");
                     return true;
