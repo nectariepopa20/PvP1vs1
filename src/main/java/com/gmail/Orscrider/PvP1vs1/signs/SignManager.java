@@ -146,9 +146,8 @@ public class SignManager implements Listener {
                     Location loc = new Location(w, qd.x, qd.y, qd.z);
                     if (!(loc.getBlock().getState() instanceof Sign)) continue;
                     Sign s = (Sign) loc.getBlock().getState();
-                    List<String> names = getPlayersInQueue(qd.gamemode, qd.queueName);
-                    String line2 = names.isEmpty() ? ChatColor.translateAlternateColorCodes('&', "&0") : ChatColor.translateAlternateColorCodes('&', "&0" + String.join(", ", names));
-                    if (line2.length() > 15) line2 = line2.substring(0, 15);
+                    int count = getPlayersInQueue(qd.gamemode, qd.queueName).size();
+                    String line2 = ChatColor.translateAlternateColorCodes('&', "&0" + count + " Playing");
                     s.setLine(2, line2);
                     s.update();
                 }
@@ -197,7 +196,7 @@ public class SignManager implements Listener {
             if (line3.equals("1vs1") && ev.getPlayer().hasPermission("1vs1.queueSign.create") && pl.getDataHandler().queueExists("1v1", queueName)) {
                 ev.setLine(0, ChatColor.translateAlternateColorCodes('&', "&a[JOIN]"));
                 ev.setLine(1, ChatColor.translateAlternateColorCodes('&', "&l" + queueName));
-                ev.setLine(2, ChatColor.translateAlternateColorCodes('&', "&0"));
+                ev.setLine(2, ChatColor.translateAlternateColorCodes('&', "&00 Playing"));
                 ev.setLine(3, ChatColor.translateAlternateColorCodes('&', "&a1vs1"));
                 Location loc = ev.getBlock().getLocation();
                 QueueSignData data = new QueueSignData(loc.getWorld().getName(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), queueName, "1v1");
@@ -206,7 +205,7 @@ public class SignManager implements Listener {
             } else if (line3.equals("deathmatch") && ev.getPlayer().hasPermission("dm.queueSign.create") && pl.getDataHandler().queueExists("dm", queueName)) {
                 ev.setLine(0, ChatColor.translateAlternateColorCodes('&', "&a[JOIN]"));
                 ev.setLine(1, ChatColor.translateAlternateColorCodes('&', "&l" + queueName));
-                ev.setLine(2, ChatColor.translateAlternateColorCodes('&', "&0"));
+                ev.setLine(2, ChatColor.translateAlternateColorCodes('&', "&00 Playing"));
                 ev.setLine(3, ChatColor.translateAlternateColorCodes('&', "&cDeathmatch"));
                 Location loc = ev.getBlock().getLocation();
                 QueueSignData data = new QueueSignData(loc.getWorld().getName(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), queueName, "dm");
