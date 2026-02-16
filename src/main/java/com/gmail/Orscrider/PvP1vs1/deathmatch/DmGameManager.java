@@ -1,14 +1,19 @@
 package com.gmail.Orscrider.PvP1vs1.deathmatch;
 
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
+import com.gmail.Orscrider.PvP1vs1.util.FireworkRandomizer;
 import com.gmail.Orscrider.PvP1vs1.util.LobbyLeaveItem;
 import com.gmail.Orscrider.PvP1vs1.util.ValueContainer;
 import org.bukkit.Bukkit;
+import org.bukkit.FireworkEffect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 
@@ -16,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Manages a single deathmatch arena: lobby, countdown, spawns, and fight.
@@ -29,17 +35,21 @@ public class DmGameManager {
         COUNTDOWN_LOBBY,
         PREPARATION_BEFORE_FIGHT,
         COUNTDOWN_BEFORE_FIGHT,
-        FIGHT
+        FIGHT,
+        WINNING_PHASE
     }
 
     private final PvP1vs1 pl;
     private final String arenaName;
     private final List<Player> lobbyPlayers = new ArrayList<>();
     private final List<Player> arenaPlayers = new ArrayList<>();
+    private final List<Player> spectators = new ArrayList<>();
+    private final Map<String, Integer> killCounts = new HashMap<>();
     private final Map<String, ValueContainer> valueContMap = new HashMap<>();
     private DmArenaMode arenaStatus = DmArenaMode.NORMAL;
     private boolean enabled = true;
     private DmTimeOut dmTimeOut;
+    private int winningTimerTaskId = -1;
 
     public DmGameManager(PvP1vs1 plugin, String arenaName) {
         this.pl = plugin;
@@ -173,9 +183,12 @@ public class DmGameManager {
         setArenaStatus(DmArenaMode.PREPARATION_BEFORE_FIGHT);
         dmTimeOut.resetTimeOut();
 
+        killCounts.clear();
+        spectators.clear();
         int idx = 0;
         for (Player p : arenaPlayers) {
             if (!p.isOnline()) continue;
+            killCounts.put(p.getName(), 0);
             Location spawn = getSpawnLocation(idx + 1);
             if (spawn != null) {
                 p.closeInventory();
@@ -198,6 +211,7 @@ public class DmGameManager {
             }
             idx++;
         }
+        updateAllListNames();
 
         if (getArenaConfig().getBoolean("countdown.beforeFight.enabled", true)) {
             DmCountdownThread thread = new DmCountdownThread(pl, this, DmCountdownThread.DmCountdownType.BEFORE_FIGHT);
@@ -225,27 +239,147 @@ public class DmGameManager {
         setArenaStatus(DmArenaMode.FIGHT);
     }
 
-    public void onPlayerDeath(Player dead) {
+    public void onPlayerDeath(Player dead, Player killer) {
+        if (killer != null && killer != dead) {
+            killCounts.merge(killer.getName(), 1, Integer::sum);
+            HashMap<String, String> reps = new HashMap<>();
+            reps.put("{X}", killer.getName());
+            reps.put("{Y}", dead.getName());
+            String msg = pl.getDataHandler().getDmMessagesConfig().getString("deathBroadcast", "&c{X} &7killed &c{Y}");
+            if (msg != null) {
+                msg = org.bukkit.ChatColor.translateAlternateColorCodes('&', msg.replace("{X}", killer.getName()).replace("{Y}", dead.getName()));
+                for (Player p : arenaPlayers) {
+                    if (p != null && p.isOnline()) p.sendMessage(pl.getDataHandler().getDmPrefix() + msg);
+                }
+                for (Player p : spectators) {
+                    if (p != null && p.isOnline()) p.sendMessage(pl.getDataHandler().getDmPrefix() + msg);
+                }
+            }
+        }
+        updateAllListNames();
         arenaPlayers.remove(dead);
-        restorePlayer(dead);
+        teleportToLobbyAsSpectator(dead);
         if (arenaPlayers.size() <= 1) {
             Player winner = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
-            endGame(winner);
+            startWinningPhase(winner);
         }
     }
 
-    public void endGame(Player winner) {
-        for (Player p : new ArrayList<>(arenaPlayers)) {
-            if (p != null && p.isOnline()) restorePlayer(p);
+    private void teleportToLobbyAsSpectator(Player p) {
+        spectators.add(p);
+        p.closeInventory();
+        if (p.isInsideVehicle()) p.leaveVehicle();
+        p.teleport(getLobbyLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+        p.getInventory().clear();
+        p.getInventory().setItem(LobbyLeaveItem.getLeaveItemSlot(), LobbyLeaveItem.create(pl));
+        p.updateInventory();
+        p.setGameMode(GameMode.ADVENTURE);
+        p.setFlying(false);
+        p.setHealth(p.getMaxHealth());
+        updateAllListNames();
+    }
+
+    private void updateAllListNames() {
+        for (Player p : arenaPlayers) {
+            if (p != null && p.isOnline()) {
+                int k = killCounts.getOrDefault(p.getName(), 0);
+                p.setPlayerListName(p.getName() + " [" + k + "]");
+            }
         }
-        arenaPlayers.clear();
-        reset();
+        for (Player p : spectators) {
+            if (p != null && p.isOnline()) {
+                int k = killCounts.getOrDefault(p.getName(), 0);
+                p.setPlayerListName(p.getName() + " [" + k + "]");
+            }
+        }
+    }
+
+    public void leaveSpectator(Player p) {
+        if (!spectators.contains(p)) return;
+        spectators.remove(p);
+        restorePlayer(p);
+        resetPlayerListName(p);
+    }
+
+    public void removeSpectatorOnQuit(Player p) {
+        if (!spectators.contains(p)) return;
+        spectators.remove(p);
+        valueContMap.remove(p.getName());
+        resetPlayerListName(p);
+    }
+
+    private void resetPlayerListName(Player p) {
+        if (p != null) try { p.setPlayerListName(p.getName()); } catch (Exception ignored) {}
+    }
+
+    public void startWinningPhase(Player winner) {
+        setArenaStatus(DmArenaMode.WINNING_PHASE);
+        dmTimeOut.cancelTimeOut();
+        int totalSec = getArenaConfig().getInt("winningTimer", 10);
+        int fireworkSec = Math.max(1, totalSec / 2);
         if (winner != null && winner.isOnline()) {
             HashMap<String, String> replacements = new HashMap<>();
             replacements.put("{WINNER}", winner.getName());
             replacements.put("{ARENA}", arenaName);
             pl.sendDmMessage("winAnnounce", winner, replacements);
         }
+        final Player winRef = winner;
+        final int fireworkTicks = fireworkSec * 20;
+        final int totalTicks = totalSec * 20;
+        winningTimerTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask((Plugin) pl, new Runnable() {
+            int ticks = 0;
+
+            @Override
+            public void run() {
+                ticks += 20;
+                if (winRef != null && winRef.isOnline() && ticks <= fireworkTicks) {
+                    spawnFirework(winRef.getLocation());
+                }
+                if (ticks >= totalTicks) {
+                    Bukkit.getScheduler().cancelTask(winningTimerTaskId);
+                    winningTimerTaskId = -1;
+                    finishWinningPhaseAndRestoreAll(winRef);
+                }
+            }
+        }, 20L, 20L);
+    }
+
+    private void finishWinningPhaseAndRestoreAll(Player winner) {
+        if (winner != null && winner.isOnline()) restorePlayer(winner);
+        for (Player p : new ArrayList<>(spectators)) {
+            if (p != null && p.isOnline()) restorePlayer(p);
+        }
+        spectators.clear();
+        arenaPlayers.clear();
+        killCounts.clear();
+        reset();
+    }
+
+    private void spawnFirework(Location loc) {
+        if (loc == null || loc.getWorld() == null) return;
+        Random r = new Random();
+        Firework fw = (Firework) loc.getWorld().spawnEntity(loc, EntityType.FIREWORK_ROCKET);
+        FireworkMeta fwm = fw.getFireworkMeta();
+        fwm.addEffect(FireworkEffect.builder()
+                .with(FireworkRandomizer.fireworkType(r.nextInt(5)))
+                .withColor(FireworkRandomizer.fireworkColor(r.nextInt(17)))
+                .withColor(FireworkRandomizer.fireworkColor(r.nextInt(17)))
+                .withFade(FireworkRandomizer.fireworkColor(r.nextInt(17)))
+                .flicker(r.nextBoolean()).trail(r.nextBoolean()).build());
+        fwm.setPower(1);
+        fw.setFireworkMeta(fwm);
+    }
+
+    public void endGame(Player winner) {
+        startWinningPhase(winner);
+    }
+
+    public boolean isSpectator(Player p) {
+        return spectators.contains(p);
+    }
+
+    public List<Player> getSpectators() {
+        return new ArrayList<>(spectators);
     }
 
     public void restorePlayer(Player p) {
@@ -270,12 +404,19 @@ public class DmGameManager {
         p.addPotionEffects(values.getPotionEffects());
         p.teleport(values.getLoc(), PlayerTeleportEvent.TeleportCause.UNKNOWN);
         valueContMap.remove(name);
+        resetPlayerListName(p);
     }
 
     public void reset() {
         arenaStatus = lobbyPlayers.isEmpty() ? DmArenaMode.NORMAL : DmArenaMode.LOBBY;
         dmTimeOut.resetTimeOut();
         arenaPlayers.clear();
+        spectators.clear();
+        killCounts.clear();
+        if (winningTimerTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(winningTimerTaskId);
+            winningTimerTaskId = -1;
+        }
     }
 
     public boolean isInLobby(Player p) {

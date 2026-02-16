@@ -6,7 +6,7 @@
 
     <groupId>com.gmail.Orscrider</groupId>
     <artifactId>PvP1vs1</artifactId>
-    <version>2.0.0</version>
+    <version>2.1.0</version>
     <packaging>jar</packaging>
     <name>PvP1vs1</name>
     <description>1v1 PvP plugin - decompiled and modifiable source</description>

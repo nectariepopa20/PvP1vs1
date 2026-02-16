@@ -62,6 +62,8 @@ public class GameManager {
     private Player[] arenaPlayers = new Player[2];
     private int[] playerRoundWins = new int[2];
     private HashMap<String, ValueContainer> valueContMap = new HashMap();
+    private Player postGameLoser = null;
+    private int winningTimerTaskId = -1;
 
     public GameManager(PvP1vs1 plugin, String arenaName) {
         this.pl = plugin;
@@ -143,41 +145,97 @@ public class GameManager {
     }
 
     public void afterFight(Player winner) {
-        Player loser;
-        Player player = loser = winner == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0];
+        Player loser = winner == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0];
         if (this.getArenaConfig().getBoolean("winAnnouncement")) {
             Bukkit.broadcastMessage((String)(this.pl.getPrefix() + ChatColor.translateAlternateColorCodes((char)'&', (String)this.pl.getDataHandler().getMessagesConfig().getString("winAnnounce")).replace("{WINNER}", winner.getName()).replace("{LOSER}", loser.getName()).replace("{ARENA}", this.arenaName)));
         }
-        this.reset();
-        if (this.getArenaConfig().getBoolean("firework.inArena")) {
-            this.spawnFirework(winner.getLocation());
+        int winningTimerSec = this.getArenaConfig().getInt("winningTimer", 10);
+        this.setArenaStatus(arenaMode.WINNING_TIMER);
+        this.postGameLoser = loser;
+        this.timeOut.cancelTimeOut();
+        loser.closeInventory();
+        if (loser.isInsideVehicle()) loser.leaveVehicle();
+        loser.teleport(this.getLobbyLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+        loser.getInventory().clear();
+        loser.getInventory().setItem(LobbyLeaveItem.getLeaveItemSlot(), LobbyLeaveItem.create(this.pl));
+        loser.updateInventory();
+        loser.setGameMode(GameMode.ADVENTURE);
+        loser.setFlying(false);
+        final Player winRef = winner;
+        final Player loseRef = loser;
+        final int fireworkTicks = Math.max(1, winningTimerSec / 2) * 20;
+        final int totalTicks = winningTimerSec * 20;
+        this.winningTimerTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask((Plugin) this.pl, new Runnable() {
+            int ticks = 0;
+            @Override
+            public void run() {
+                ticks += 20;
+                if (winRef != null && winRef.isOnline() && ticks <= fireworkTicks) {
+                    GameManager.this.spawnFirework(winRef.getLocation());
+                }
+                if (ticks >= totalTicks) {
+                    Bukkit.getScheduler().cancelTask(GameManager.this.winningTimerTaskId);
+                    GameManager.this.winningTimerTaskId = -1;
+                    GameManager.this.doAfterFightRestore(winRef, loseRef);
+                }
+            }
+        }, 20L, 20L);
+    }
+
+    private void doAfterFightRestore(Player winner, Player loser) {
+        if (winner != null && winner.isOnline()) {
+            this.restorePlayer(winner);
+            this.refreshPlayer(winner);
         }
-        this.restorePlayer(winner);
-        this.restorePlayer(loser);
-        this.refreshPlayer(winner);
-        this.refreshPlayer(loser);
-        if (this.getArenaConfig().getBoolean("firework.afterTeleport")) {
+        if (this.postGameLoser != null && this.postGameLoser.isOnline()) {
+            this.restorePlayer(this.postGameLoser);
+            this.refreshPlayer(this.postGameLoser);
+        }
+        this.postGameLoser = null;
+        this.reset();
+        if (this.getArenaConfig().getBoolean("firework.afterTeleport") && winner != null && winner.isOnline()) {
             this.spawnFirework(winner.getLocation());
         }
         DBConnectionController dbController = DBConnectionController.getInstance();
-        dbController.savePlayerScore(winner.getUniqueId().toString(), this.arenaName, this.getArenaConfig().getInt("points.win"));
-        dbController.savePlayerScore(loser.getUniqueId().toString(), this.arenaName, this.getArenaConfig().getInt("points.lose"));
-        dbController.addPlayerWin(winner.getUniqueId().toString());
-        dbController.addPlayerLoss(loser.getUniqueId().toString());
+        if (winner != null) {
+            dbController.savePlayerScore(winner.getUniqueId().toString(), this.arenaName, this.getArenaConfig().getInt("points.win"));
+            dbController.addPlayerWin(winner.getUniqueId().toString());
+        }
+        if (loser != null) {
+            dbController.savePlayerScore(loser.getUniqueId().toString(), this.arenaName, this.getArenaConfig().getInt("points.lose"));
+            dbController.addPlayerLoss(loser.getUniqueId().toString());
+        }
         List<String> commands = this.getArenaConfig().getStringList("commandsToRunAtEnd");
-        if (!commands.isEmpty()) {
+        if (!commands.isEmpty() && winner != null && loser != null) {
             for (String command : commands) {
                 String cmd = command.replace("{WINNER}", winner.getName()).replace("{LOSER}", loser.getName()).replace("{ARENA}", this.getArenaName()).replace("{ROUNDS}", String.valueOf(this.getTotalRounds()));
                 Bukkit.dispatchCommand((CommandSender)Bukkit.getConsoleSender(), cmd);
             }
         }
-        if (this.getArenaConfig().getBoolean("prize.items.enabled")) {
+        if (winner != null && winner.isOnline() && this.getArenaConfig().getBoolean("prize.items.enabled")) {
             winner.getInventory().addItem(this.pl.getDataHandler().getItems(this.arenaName, "prize.items.itemPrizes"));
         }
-        if (this.getArenaConfig().getBoolean("prize.economy.enabled")) {
+        if (winner != null && this.getArenaConfig().getBoolean("prize.economy.enabled")) {
             PvP1vs1.economy.depositPlayer(Bukkit.getOfflinePlayer((String)winner.getName()), this.pl.getConfig().getDouble("prize.economy.amount"));
         }
         MetricsHandler.getInstance().increaseGamesPlayed();
+    }
+
+    public Player getPostGameLoser() {
+        return this.postGameLoser;
+    }
+
+    public void leavePostGameSpectator(Player p) {
+        if (this.postGameLoser != p) return;
+        this.restorePlayer(p);
+        this.refreshPlayer(p);
+        this.postGameLoser = null;
+    }
+
+    public void removePostGameLoserOnQuit(Player p) {
+        if (this.postGameLoser != p) return;
+        this.valueContMap.remove(p.getName());
+        this.postGameLoser = null;
     }
 
     public void restorePlayer(final Player p) {
@@ -389,6 +447,11 @@ public class GameManager {
         this.timeOut.resetTimeOut();
         this.arenaPlayers = new Player[2];
         this.playerRoundWins = new int[2];
+        this.postGameLoser = null;
+        if (this.winningTimerTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(this.winningTimerTaskId);
+            this.winningTimerTaskId = -1;
+        }
     }
 
     public boolean isGameOver(Player winner) {
@@ -488,6 +551,8 @@ public class GameManager {
                         .replace("{TIME_LEFT}", String.valueOf(this.timeOut.getTimeOut()));
             case NORMAL:
                 return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.normal");
+            case WINNING_TIMER:
+                return this.pl.getDataHandler().getMessagesConfig().getString("arenaModes.winningTimer", "Winning");
             default:
                 return "";
         }
@@ -546,7 +611,8 @@ public class GameManager {
         PREPERATION_BEFORE_FIGHT,
         COUNTDOWN_BEFORE_FIGHT,
         FIGHT,
-        BETWEEN_ROUNDS
+        BETWEEN_ROUNDS,
+        WINNING_TIMER
     }
 }
 

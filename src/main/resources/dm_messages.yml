@@ -19,6 +19,7 @@ countdownBeforeFight: '&aFight starts in &6{COUNTDOWN} &aseconds'
 afterPlayerFreezing: '&aIt is time to fight!'
 
 # Fight / result
+deathBroadcast: '&c{X} &7killed &c{Y}'
 winAnnounce: '&c{WINNER} &awon the deathmatch in arena &6{ARENA}'
 timeLeft: '&aTime left: &6{TIME_LEFT} &aseconds'
 timeOut: '&cThe battle took too long'

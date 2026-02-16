@@ -86,5 +86,6 @@ arenaModes:
   countdownBeforeFight: '&4Countdown'
   fight: '&4{ROUND}/{MAX_ROUNDS} - {TIME_LEFT}s'
   normal: '&2Empty'
+  winningTimer: '&6Winning'
 sign:
   inLobby: 'in lobby'

@@ -1,6 +1,6 @@
 name: 1vs1
 main: com.gmail.Orscrider.PvP1vs1.PvP1vs1
-version: '2.0.0'
+version: '2.1.0'
 api-version: '1.21'
 author: Orscrider
 dev-url: http://dev.bukkit.org/bukkit-plugins/pvp-1vs1/

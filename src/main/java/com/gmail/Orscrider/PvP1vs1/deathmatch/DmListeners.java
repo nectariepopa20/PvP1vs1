@@ -8,6 +8,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -42,7 +43,7 @@ public class DmListeners implements Listener {
         Player p = ev.getPlayer();
         for (Map.Entry<String, DmGameManager> e : dmArenaManager.getArenas().entrySet()) {
             DmGameManager arena = e.getValue();
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 if (p.hasPermission("dm.teleport")) return;
                 int maxDist = arena.getArenaConfig().getInt("maximumTeleportDistance", 50);
                 if (ev.getFrom().getWorld() != ev.getTo().getWorld() || ev.getFrom().distance(ev.getTo()) > maxDist) {
@@ -52,8 +53,9 @@ public class DmListeners implements Listener {
                 }
                 return;
             }
-            if ((arena.getArenaStatus() == DmGameManager.DmArenaMode.COUNTDOWN_BEFORE_FIGHT || arena.getArenaStatus() == DmGameManager.DmArenaMode.FIGHT)
-                    && arena.arenaPlayersContains(p)) {
+            if ((arena.getArenaStatus() == DmGameManager.DmArenaMode.COUNTDOWN_BEFORE_FIGHT || arena.getArenaStatus() == DmGameManager.DmArenaMode.FIGHT
+                    || arena.getArenaStatus() == DmGameManager.DmArenaMode.WINNING_PHASE)
+                    && (arena.arenaPlayersContains(p) || arena.isSpectator(p))) {
                 if (p.hasPermission("dm.teleport")) return;
                 int maxDist = arena.getArenaConfig().getInt("maximumTeleportDistance", 50);
                 if (ev.getFrom().getWorld() != ev.getTo().getWorld() || ev.getFrom().distance(ev.getTo()) > maxDist) {
@@ -69,7 +71,7 @@ public class DmListeners implements Listener {
     public void onBlockPlace(BlockPlaceEvent ev) {
         Player p = ev.getPlayer();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 pl.messageParserDm("blockPlaceInLobby", p);
                 ev.setCancelled(true);
                 return;
@@ -86,7 +88,7 @@ public class DmListeners implements Listener {
     public void onBlockBreak(BlockBreakEvent ev) {
         Player p = ev.getPlayer();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 ev.setCancelled(true);
                 return;
             }
@@ -101,7 +103,7 @@ public class DmListeners implements Listener {
     public void onDrop(PlayerDropItemEvent ev) {
         Player p = ev.getPlayer();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 ev.setCancelled(true);
                 return;
             }
@@ -117,7 +119,7 @@ public class DmListeners implements Listener {
     public void onPickUp(PlayerPickupItemEvent ev) {
         Player p = ev.getPlayer();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 ev.setCancelled(true);
                 return;
             }
@@ -134,9 +136,18 @@ public class DmListeners implements Listener {
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!LobbyLeaveItem.isLeaveItem(hand, pl)) return;
         for (Map.Entry<String, DmGameManager> e : dmArenaManager.getArenas().entrySet()) {
-            if (e.getValue().isInLobby(p)) {
+            DmGameManager arena = e.getValue();
+            if (arena.isInLobby(p)) {
                 ev.setCancelled(true);
-                e.getValue().leaveLobby(p);
+                arena.leaveLobby(p);
+                java.util.HashMap<String, String> replacements = new java.util.HashMap<>();
+                replacements.put("{ARENA}", e.getKey());
+                pl.sendDmMessage("leaveLobby", p, replacements);
+                return;
+            }
+            if (arena.isSpectator(p)) {
+                ev.setCancelled(true);
+                arena.leaveSpectator(p);
                 java.util.HashMap<String, String> replacements = new java.util.HashMap<>();
                 replacements.put("{ARENA}", e.getKey());
                 pl.sendDmMessage("leaveLobby", p, replacements);
@@ -152,7 +163,7 @@ public class DmListeners implements Listener {
         ItemStack clicked = ev.getCurrentItem();
         if (clicked != null && LobbyLeaveItem.isLeaveItem(clicked, pl)) {
             for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-                if (arena.isInLobby(p)) {
+                if (arena.isInLobby(p) || arena.isSpectator(p)) {
                     ev.setCancelled(true);
                     return;
                 }
@@ -161,7 +172,7 @@ public class DmListeners implements Listener {
         ItemStack cursor = ev.getCursor();
         if (cursor != null && cursor.getType() != org.bukkit.Material.AIR && LobbyLeaveItem.isLeaveItem(cursor, pl)) {
             for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-                if (arena.isInLobby(p)) {
+                if (arena.isInLobby(p) || arena.isSpectator(p)) {
                     ev.setCancelled(true);
                     return;
                 }
@@ -174,7 +185,7 @@ public class DmListeners implements Listener {
         if (!(ev.getWhoClicked() instanceof Player)) return;
         Player p = (Player) ev.getWhoClicked();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (!arena.isInLobby(p)) continue;
+            if (!arena.isInLobby(p) && !arena.isSpectator(p)) continue;
             if (ev.getOldCursor() != null && LobbyLeaveItem.isLeaveItem(ev.getOldCursor(), pl)) {
                 ev.setCancelled(true);
                 return;
@@ -210,8 +221,12 @@ public class DmListeners implements Listener {
                 arena.removeFromLobbyOnQuit(p);
                 return;
             }
+            if (arena.isSpectator(p)) {
+                arena.removeSpectatorOnQuit(p);
+                return;
+            }
             if (arena.arenaPlayersContains(p)) {
-                arena.onPlayerDeath(p);
+                arena.onPlayerDeath(p, null);
                 return;
             }
         }
@@ -222,7 +237,7 @@ public class DmListeners implements Listener {
         if (!(ev.getEntity() instanceof Player)) return;
         Player p = (Player) ev.getEntity();
         for (DmGameManager arena : dmArenaManager.getArenas().values()) {
-            if (arena.isInLobby(p)) {
+            if (arena.isInLobby(p) || arena.isSpectator(p)) {
                 ev.setCancelled(true);
                 return;
             }
@@ -232,9 +247,14 @@ public class DmListeners implements Listener {
                 return;
             }
             if (!arena.arenaPlayersContains(p)) continue;
+            Player killer = null;
+            if (ev instanceof EntityDamageByEntityEvent) {
+                EntityDamageByEntityEvent byEntity = (EntityDamageByEntityEvent) ev;
+                if (byEntity.getDamager() instanceof Player) killer = (Player) byEntity.getDamager();
+            }
             if (ev.getFinalDamage() >= p.getHealth()) {
                 ev.setCancelled(true);
-                arena.onPlayerDeath(p);
+                arena.onPlayerDeath(p, killer);
             }
             return;
         }

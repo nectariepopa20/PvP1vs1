@@ -22,6 +22,7 @@ countdown:
 maximumTeleportDistance: 50
 health: 20
 timeOut: 300
+winningTimer: 10
 inventory:
   items: []
   armor: []

@@ -67,7 +67,7 @@ implements Listener {
         }
         Player p = ev.getPlayer();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                 if (p.hasPermission("1vs1.teleport")) continue;
                 if (ev.getFrom().getWorld() != ev.getTo().getWorld() || ev.getFrom().distance(ev.getTo()) > (double) arena.getValue().getArenaConfig().getInt("maximumTeleportDistance", 50)) {
                     p.teleport(ev.getFrom());
@@ -76,7 +76,7 @@ implements Listener {
                 }
                 return;
             }
-            if (arena.getValue().getArenaStatus() != GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT && arena.getValue().getArenaStatus() != GameManager.arenaMode.FIGHT || !arena.getValue().arenaPlayersContains(p) || p.hasPermission("1vs1.teleport") || ev.getFrom().getWorld() == ev.getTo().getWorld() && !(ev.getFrom().distance(ev.getTo()) > (double)arena.getValue().getArenaConfig().getInt("maximumTeleportDistance"))) continue;
+            if (arena.getValue().getArenaStatus() != GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT && arena.getValue().getArenaStatus() != GameManager.arenaMode.FIGHT && arena.getValue().getArenaStatus() != GameManager.arenaMode.WINNING_TIMER || !arena.getValue().arenaPlayersContains(p) && arena.getValue().getPostGameLoser() != p || p.hasPermission("1vs1.teleport") || ev.getFrom().getWorld() == ev.getTo().getWorld() && !(ev.getFrom().distance(ev.getTo()) > (double)arena.getValue().getArenaConfig().getInt("maximumTeleportDistance"))) continue;
             p.teleport(ev.getFrom());
             this.pl.messageParser("teleportOutOfTheArena", p);
             ev.setCancelled(true);
@@ -87,7 +87,7 @@ implements Listener {
     public void onBlockPlace(BlockPlaceEvent ev) {
         Player p = ev.getPlayer();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                 this.pl.messageParser("blockPlaceInLobby", p);
                 ev.setCancelled(true);
                 return;
@@ -102,7 +102,7 @@ implements Listener {
     public void onBlockBreak(BlockBreakEvent ev) {
         Player p = ev.getPlayer();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                 ev.setCancelled(true);
                 return;
             }
@@ -115,7 +115,7 @@ implements Listener {
     public void onDrop(PlayerDropItemEvent ev) {
         Player p = ev.getPlayer();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                 ev.setCancelled(true);
                 return;
             }
@@ -129,7 +129,7 @@ implements Listener {
     public void onPickUp(PlayerPickupItemEvent ev) {
         Player p = ev.getPlayer();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                 ev.setCancelled(true);
                 return;
             }
@@ -144,10 +144,19 @@ implements Listener {
         ItemStack hand = p.getInventory().getItemInMainHand();
         if (!LobbyLeaveItem.isLeaveItem(hand, this.pl)) return;
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (arena.getValue().isInLobby(p)) {
+            GameManager gm = arena.getValue();
+            if (gm.isInLobby(p)) {
                 ev.setCancelled(true);
-                arena.getValue().leaveLobby(p);
-                arena.getValue().removeDuelPartner(p);
+                gm.leaveLobby(p);
+                gm.removeDuelPartner(p);
+                java.util.HashMap<String, String> replacements = new java.util.HashMap<>();
+                replacements.put("{ARENA}", arena.getKey());
+                this.pl.send1vs1Message("leaveLobby", p, replacements);
+                return;
+            }
+            if (gm.getPostGameLoser() == p) {
+                ev.setCancelled(true);
+                gm.leavePostGameSpectator(p);
                 java.util.HashMap<String, String> replacements = new java.util.HashMap<>();
                 replacements.put("{ARENA}", arena.getKey());
                 this.pl.send1vs1Message("leaveLobby", p, replacements);
@@ -163,7 +172,7 @@ implements Listener {
         ItemStack clicked = ev.getCurrentItem();
         if (clicked != null && LobbyLeaveItem.isLeaveItem(clicked, this.pl)) {
             for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-                if (arena.getValue().isInLobby(p)) {
+                if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                     ev.setCancelled(true);
                     return;
                 }
@@ -172,7 +181,7 @@ implements Listener {
         ItemStack cursor = ev.getCursor();
         if (cursor != null && cursor.getType() != org.bukkit.Material.AIR && LobbyLeaveItem.isLeaveItem(cursor, this.pl)) {
             for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-                if (arena.getValue().isInLobby(p)) {
+                if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                     ev.setCancelled(true);
                     return;
                 }
@@ -185,7 +194,7 @@ implements Listener {
         if (!(ev.getWhoClicked() instanceof Player)) return;
         Player p = (Player) ev.getWhoClicked();
         for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-            if (!arena.getValue().isInLobby(p)) continue;
+            if (!arena.getValue().isInLobby(p) && arena.getValue().getPostGameLoser() != p) continue;
             if (ev.getOldCursor() != null && LobbyLeaveItem.isLeaveItem(ev.getOldCursor(), this.pl)) {
                 ev.setCancelled(true);
                 return;
@@ -229,6 +238,10 @@ implements Listener {
                 arena.getValue().removeDuelPartner(p);
                 return;
             }
+            if (arena.getValue().getPostGameLoser() == p) {
+                arena.getValue().removePostGameLoserOnQuit(p);
+                return;
+            }
             if (arena.getValue().arenaPlayersContains(p)) {
                 arena.getValue().afterFight(p == arena.getValue().getArenaPlayers()[0] ? arena.getValue().getArenaPlayers()[1] : arena.getValue().getArenaPlayers()[0]);
                 MetricsHandler.getInstance().increaseLoggedOutGames();
@@ -242,7 +255,7 @@ implements Listener {
         if (ev.getEntity() instanceof Player) {
             Player p = (Player) ev.getEntity();
             for (Map.Entry<String, GameManager> arena : this.arenaManager.getArenas().entrySet()) {
-                if (arena.getValue().isInLobby(p)) {
+                if (arena.getValue().isInLobby(p) || arena.getValue().getPostGameLoser() == p) {
                     ev.setCancelled(true);
                     return;
                 }

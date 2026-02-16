@@ -50,6 +50,7 @@ firework:
   afterTeleport: true
 health: 20
 timeOut: 300
+winningTimer: 10
 rounds: 3
 maximumTeleportDistance: 1
 playerItemDrop: false
