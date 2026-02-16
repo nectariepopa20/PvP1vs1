@@ -25,3 +25,5 @@ Thumbs.db
 
 # Optional: ignore original JAR if you prefer not to commit it
 # PvP1vs1-1.7.1.jar
+# Release JARs in project root
+/PvP1vs1-*.jar

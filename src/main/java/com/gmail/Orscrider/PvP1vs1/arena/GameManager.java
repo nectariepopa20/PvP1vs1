@@ -267,7 +267,7 @@ public class GameManager {
                 p.removePotionEffect(pe.getType());
             }
             p.addPotionEffects(values.getPotionEffects());
-            p.teleport(values.getLoc(), PlayerTeleportEvent.TeleportCause.UNKNOWN);
+            p.teleport(values.getLoc(), PlayerTeleportEvent.TeleportCause.PLUGIN);
             this.valueContMap.remove(name);
         }
     }
