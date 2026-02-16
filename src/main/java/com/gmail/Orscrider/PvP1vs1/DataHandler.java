@@ -34,10 +34,16 @@ public class DataHandler {
     private PvP1vs1 pl;
     HashMap<String, ArenaConfig> arenaConfigs = new HashMap();
     private File arenaFolder;
+    private HashMap<String, ArenaConfig> dmArenaConfigs = new HashMap<>();
+    private File dmArenaFolder;
     private FileConfiguration messagesConfig = null;
     private File messagesConfigFile = null;
     private static String MESSAGES_CONFIG_FILE_NAME;
     private static String ARENA_CONFIG_FILE_NAME;
+    private static String DM_ARENA_CONFIG_FILE_NAME = "dm_arena.yml";
+    private static String DM_MESSAGES_CONFIG_FILE_NAME = "dm_messages.yml";
+    private FileConfiguration dmMessagesConfig = null;
+    private File dmMessagesConfigFile = null;
 
     public DataHandler(File dataFolder, FileConfiguration fileConfig, PvP1vs1 pl) {
         if (dataHandler == null) {
@@ -69,6 +75,19 @@ public class DataHandler {
             arenaName = arenaName.replace(".yml", "");
             this.addArenaConfig(arenaName);
         }
+        this.dmArenaFolder = new File(this.dataFolder, "dm_arenas/");
+        if (!this.dmArenaFolder.exists() || !this.dmArenaFolder.isDirectory()) {
+            this.dmArenaFolder.mkdirs();
+        }
+        String[] dmList = this.dmArenaFolder.list();
+        if (dmList != null) {
+            for (String name : dmList) {
+                if (!name.endsWith(".yml")) continue;
+                name = name.replace(".yml", "");
+                this.addDmArenaConfig(name);
+            }
+        }
+        this.reloadDmMessagesConfig();
     }
 
     public void reloadArenaConfigs() {
@@ -176,6 +195,39 @@ public class DataHandler {
         return this.messagesConfig;
     }
 
+    public void reloadDmMessagesConfig() {
+        if (this.dmMessagesConfigFile == null) {
+            this.dmMessagesConfigFile = new File(this.dataFolder, "dm_messages.yml");
+        }
+        this.dmMessagesConfig = YamlConfiguration.loadConfiguration(this.dmMessagesConfigFile);
+        Reader r = this.pl.getReaderForResource(DM_MESSAGES_CONFIG_FILE_NAME);
+        if (r != null) {
+            YamlConfiguration defaultCfg = YamlConfiguration.loadConfiguration(r);
+            try { r.close(); } catch (IOException e) { LogHandler.severe(e.getMessage()); }
+            this.dmMessagesConfig.setDefaults((Configuration) defaultCfg);
+            this.dmMessagesConfig.options().copyDefaults(true);
+            this.saveDmMessagesConfig();
+        }
+    }
+
+    public void saveDmMessagesConfig() {
+        if (this.dmMessagesConfig == null || this.dmMessagesConfigFile == null) return;
+        try {
+            this.dmMessagesConfig.save(this.dmMessagesConfigFile);
+        } catch (IOException e) {
+            LogHandler.severe("Could not save dm_messages.yml", e);
+        }
+    }
+
+    public FileConfiguration getDmMessagesConfig() {
+        if (this.dmMessagesConfig == null) this.reloadDmMessagesConfig();
+        return this.dmMessagesConfig;
+    }
+
+    public String getDmPrefix() {
+        return ChatColor.translateAlternateColorCodes('&', getDmMessagesConfig().getString("prefix", "&8[&4DM&8] &r"));
+    }
+
     public void addArenaConfig(String arenaName) {
         this.arenaConfigs.put(arenaName, new ArenaConfig(null, null));
         this.reloadArenaConfig(arenaName);
@@ -232,6 +284,94 @@ public class DataHandler {
         this.getArenaConfig(arenaName).set("lobby.yaw", (Object)Float.valueOf(loc.getYaw()));
         this.getArenaConfig(arenaName).set("lobby.pitch", (Object)Float.valueOf(loc.getPitch()));
         this.saveArenaConfig(arenaName);
+    }
+
+    public ArrayList<String> getDmArenaNames() {
+        return new ArrayList<>(this.dmArenaConfigs.keySet());
+    }
+
+    public FileConfiguration getDmArenaConfig(String arenaName) {
+        FileConfiguration cfg = null;
+        if (this.dmArenaConfigs.containsKey(arenaName) && (cfg = this.dmArenaConfigs.get(arenaName).getConfig()) == null) {
+            this.reloadDmArenaConfig(arenaName);
+        }
+        return this.dmArenaConfigs.containsKey(arenaName) ? this.dmArenaConfigs.get(arenaName).getConfig() : null;
+    }
+
+    public void addDmArenaConfig(String arenaName) {
+        this.dmArenaConfigs.put(arenaName, new ArenaConfig(null, null));
+        this.reloadDmArenaConfig(arenaName);
+    }
+
+    public void delDmArenaConfig(String arenaName) {
+        File f = new File(this.dmArenaFolder, arenaName + ".yml");
+        if (f.exists()) f.delete();
+        this.dmArenaConfigs.remove(arenaName);
+    }
+
+    public void saveDmArenaConfig(String arenaName) {
+        if (!this.dmArenaConfigs.containsKey(arenaName)) return;
+        FileConfiguration cfg = this.dmArenaConfigs.get(arenaName).getConfig();
+        File file = this.dmArenaConfigs.get(arenaName).getFile();
+        if (cfg == null || file == null) return;
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            LogHandler.severe("Could not save DM arena " + arenaName + ".yml", e);
+        }
+    }
+
+    public void reloadDmArenaConfig(String arenaName) {
+        File file = this.dmArenaConfigs.containsKey(arenaName) ? this.dmArenaConfigs.get(arenaName).getFile() : null;
+        if (file == null) file = new File(this.dmArenaFolder, arenaName + ".yml");
+        YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        Reader r = this.pl.getReaderForResource(DM_ARENA_CONFIG_FILE_NAME);
+        if (r != null) {
+            YamlConfiguration defaultCfg = YamlConfiguration.loadConfiguration(r);
+            try { r.close(); } catch (IOException e) { LogHandler.severe(e.getMessage(), e); }
+            cfg.setDefaults((Configuration) defaultCfg);
+            cfg.options().copyDefaults(true);
+            this.dmArenaConfigs.put(arenaName, new ArenaConfig(cfg, file));
+            this.saveDmArenaConfig(arenaName);
+        }
+    }
+
+    public void setDmLobbyInConfig(String arenaName, Location loc) {
+        this.getDmArenaConfig(arenaName).set("lobby.world", loc.getWorld().getName());
+        this.getDmArenaConfig(arenaName).set("lobby.x", loc.getX());
+        this.getDmArenaConfig(arenaName).set("lobby.y", loc.getY());
+        this.getDmArenaConfig(arenaName).set("lobby.z", loc.getZ());
+        this.getDmArenaConfig(arenaName).set("lobby.yaw", (float) loc.getYaw());
+        this.getDmArenaConfig(arenaName).set("lobby.pitch", (float) loc.getPitch());
+        this.saveDmArenaConfig(arenaName);
+    }
+
+    public void setDmSpawnInConfig(String arenaName, int spawnIndex, Location loc) {
+        String path = "spawn" + spawnIndex + ".";
+        this.getDmArenaConfig(arenaName).set(path + "world", loc.getWorld().getName());
+        this.getDmArenaConfig(arenaName).set(path + "x", loc.getX());
+        this.getDmArenaConfig(arenaName).set(path + "y", loc.getY());
+        this.getDmArenaConfig(arenaName).set(path + "z", loc.getZ());
+        this.getDmArenaConfig(arenaName).set(path + "yaw", (float) loc.getYaw());
+        this.getDmArenaConfig(arenaName).set(path + "pitch", (float) loc.getPitch());
+        this.saveDmArenaConfig(arenaName);
+    }
+
+    public void setDmItems(ItemStack[] armor, ItemStack[] contents, String arenaName) {
+        this.getDmArenaConfig(arenaName).set("inventory.armor", armor);
+        this.getDmArenaConfig(arenaName).set("inventory.items", contents);
+        this.saveDmArenaConfig(arenaName);
+        this.reloadDmArenaConfig(arenaName);
+    }
+
+    public ItemStack[] getDmItems(String arenaName, String configPath) {
+        List<?> list = this.getDmArenaConfig(arenaName).getList(configPath);
+        if (list == null) return new ItemStack[0];
+        return (ItemStack[]) list.toArray(new ItemStack[0]);
+    }
+
+    public File getDmArenaFolder() {
+        return this.dmArenaFolder;
     }
 
     public String getDatabaseType() {

@@ -1,0 +1,61 @@
+# Deathmatch messages (separate from 1v1 messages.yml)
+prefix: '&8[&4DM&8] &r'
+
+# Lobby
+alreadyInLobby: '&cYou are already in the lobby of arena &6{ARENA}'
+notInLobby: '&cYou are not in a DM lobby'
+leaveLobby: '&aYou left the lobby of arena &6{ARENA}'
+joinLobby: '&aYou joined the lobby of arena &6{ARENA}'
+arenaInGame: '&cArena &6{ARENA} &cis currently in game. Try again later.'
+arenaLobbyNotSet: '&cThe lobby for arena &6{ARENA} &chas not been set. Ask an admin to use /dm arena setlobby'
+lobbyFull: '&cThe lobby of arena &6{ARENA} &cis full. Try another arena.'
+playerJoinedLobby: '&a{PLAYER} has joined the game ({COUNT}/{MAX})'
+playerLeftLobby: '&a{PLAYER} has left the game ({COUNT}/{MAX})'
+
+# Countdown
+countdownLobby: '&aYou will be teleported into the arena in &6{COUNTDOWN} &aseconds'
+getTeleportedIntoArena: '&aGet ready for fighting!'
+countdownBeforeFight: '&aFight starts in &6{COUNTDOWN} &aseconds'
+afterPlayerFreezing: '&aIt is time to fight!'
+
+# Fight / result
+winAnnounce: '&c{WINNER} &awon the deathmatch in arena &6{ARENA}'
+timeLeft: '&aTime left: &6{TIME_LEFT} &aseconds'
+timeOut: '&cThe battle took too long'
+
+# Permissions / errors
+insufficientPermission: '&cYou do not have permission to do this'
+arenaDoesNotExist: '&cThe arena &6{ARENA} &cdoes not exist'
+arenaDisabled: '&cThe arena &6{ARENA} &ais disabled'
+noEnabledArenas: '&aThere are no enabled DM arenas'
+
+# Arena admin
+arenaAdded: '&aArena &6{ARENA} &asuccessfully created'
+arenaAlreadyExists: '&cThe arena &6{ARENA} &calready exists'
+arenaDeleted: '&aArena &6{ARENA} &asuccessfully deleted'
+arenaWasDisabled: '&aThe arena &6{ARENA} &awas disabled'
+arenaWasEnabled: '&aThe arena &6{ARENA} &awas enabled'
+setLobby: '&6Lobby &asuccessfully set in arena &6{ARENA}'
+setSpawn1: '&6Spawn &asuccessfully set in arena &6{ARENA}'
+invSet: '&aInventory set for arena &6{ARENA}'
+enabledArenas: '&aEnabled arenas: {ENABLED_ARENAS}'
+disabledArenas: '&7Disabled arenas: {DISABLED_ARENAS}'
+
+# Protection
+teleportOutOfLobby: '&cYou are not allowed to teleport out of the lobby'
+teleportOutOfTheArena: '&cYou are not allowed to teleport out of the arena'
+blockPlaceInLobby: '&cYou are not allowed to place blocks in the lobby'
+blockPlaceInArena: '&cYou are not allowed to place blocks in the arena'
+itemDropInArena: '&cYou are not allowed to drop items in the arena'
+
+# Plugin
+pluginWasDisabled: '&aThe plugin was disabled'
+
+# Info
+info:
+- '&aEnabled: &6{ENABLED}'
+- '&aGame status: &6{GAME_STATUS}'
+- '&aLobby count: &6{LOBBY_COUNT} / &6{MAX}'
+- '&aIn lobby: &6{IN_LOBBY}'
+- '&aLobby players: &6{LOBBY_PLAYERS}'
+- '&aCurrently in arena: &6{ARENA_PLAYERS}'

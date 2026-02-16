@@ -11,6 +11,9 @@ commands:
     description: 1vs1 command
     usage: /1vs1 <subcommand>
     aliases: [1on1, 1v1]
+  dm:
+    description: Deathmatch command
+    usage: /dm <subcommand>
          
 permissions:
   1vs1.*:
@@ -89,3 +92,32 @@ permissions:
       1vs1.top.*: true
       1vs1.stats: true
       1vs1.stats.otherPlayers: true
+  dm.*:
+    default: op
+    children:
+      dm.join: true
+      dm.leave: true
+      dm.info: true
+      dm.randomJoin: true
+      dm.arena.list: true
+      dm.arena.add: true
+      dm.arena.del: true
+      dm.arena.setlobby: true
+      dm.arena.setspawn: true
+      dm.arena.setmaxplayers: true
+      dm.arena.setInv: true
+      dm.arena.enable: true
+      dm.arena.disable: true
+      dm.teleport: true
+      dm.blockBreak: true
+      dm.blockPlace: true
+      dm.itemDrop: true
+      dm.itemPickUp: true
+  dm.default:
+    default: true
+    children:
+      dm.join: true
+      dm.leave: true
+      dm.info: true
+      dm.arena.list: true
+      dm.randomJoin: true

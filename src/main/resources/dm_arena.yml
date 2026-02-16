@@ -1,0 +1,27 @@
+# Deathmatch arena default configuration
+enabled: true
+maxPlayers: 8
+lobby:
+  world: world
+  x: 0
+  y: 64
+  z: 0
+  yaw: 0
+  pitch: 0
+countdown:
+  lobby:
+    enabled: true
+    duration: 10
+    sound: true
+  beforeFight:
+    enabled: true
+    duration: 5
+    disableMoving: true
+    invincibility: true
+    sound: true
+maximumTeleportDistance: 50
+health: 20
+timeOut: 300
+inventory:
+  items: []
+  armor: []
