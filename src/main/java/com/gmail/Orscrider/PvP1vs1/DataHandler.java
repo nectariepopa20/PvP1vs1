@@ -44,6 +44,10 @@ public class DataHandler {
     private static String DM_MESSAGES_CONFIG_FILE_NAME = "dm_messages.yml";
     private FileConfiguration dmMessagesConfig = null;
     private File dmMessagesConfigFile = null;
+    private FileConfiguration queuesConfig = null;
+    private File queuesConfigFile = null;
+    private FileConfiguration queueSignsConfig = null;
+    private File queueSignsConfigFile = null;
 
     public DataHandler(File dataFolder, FileConfiguration fileConfig, PvP1vs1 pl) {
         if (dataHandler == null) {
@@ -88,6 +92,103 @@ public class DataHandler {
             }
         }
         this.reloadDmMessagesConfig();
+        this.reloadQueuesConfig();
+        this.reloadQueueSignsConfig();
+    }
+
+    public void reloadQueuesConfig() {
+        if (this.queuesConfigFile == null) {
+            this.queuesConfigFile = new File(this.dataFolder, "queues.yml");
+        }
+        this.queuesConfig = YamlConfiguration.loadConfiguration(this.queuesConfigFile);
+        if (!this.queuesConfig.contains("1v1")) this.queuesConfig.createSection("1v1");
+        if (!this.queuesConfig.contains("dm")) this.queuesConfig.createSection("dm");
+        this.saveQueuesConfig();
+    }
+
+    public void saveQueuesConfig() {
+        if (this.queuesConfig == null || this.queuesConfigFile == null) return;
+        try {
+            this.queuesConfig.save(this.queuesConfigFile);
+        } catch (IOException e) {
+            LogHandler.severe("Could not save queues.yml", e);
+        }
+    }
+
+    public FileConfiguration getQueuesConfig() {
+        if (this.queuesConfig == null) this.reloadQueuesConfig();
+        return this.queuesConfig;
+    }
+
+    /** Gamemode is "1v1" or "dm". */
+    public List<String> getQueueArenas(String gamemode, String queueName) {
+        List<String> list = getQueuesConfig().getStringList(gamemode + "." + queueName);
+        return list != null ? new ArrayList<>(list) : new ArrayList<>();
+    }
+
+    public boolean queueExists(String gamemode, String queueName) {
+        return getQueuesConfig().contains(gamemode + "." + queueName);
+    }
+
+    public boolean createQueue(String gamemode, String queueName) {
+        if (queueExists(gamemode, queueName)) return false;
+        getQueuesConfig().set(gamemode + "." + queueName, new ArrayList<String>());
+        saveQueuesConfig();
+        return true;
+    }
+
+    public boolean deleteQueue(String gamemode, String queueName) {
+        if (!queueExists(gamemode, queueName)) return false;
+        getQueuesConfig().set(gamemode + "." + queueName, null);
+        saveQueuesConfig();
+        return true;
+    }
+
+    public boolean addArenaToQueue(String gamemode, String queueName, String arenaName) {
+        if (!queueExists(gamemode, queueName)) return false;
+        List<String> arenas = getQueueArenas(gamemode, queueName);
+        if (arenas.contains(arenaName)) return false;
+        arenas.add(arenaName);
+        getQueuesConfig().set(gamemode + "." + queueName, arenas);
+        saveQueuesConfig();
+        return true;
+    }
+
+    public boolean remArenaFromQueue(String gamemode, String queueName, String arenaName) {
+        if (!queueExists(gamemode, queueName)) return false;
+        List<String> arenas = getQueueArenas(gamemode, queueName);
+        if (!arenas.remove(arenaName)) return false;
+        getQueuesConfig().set(gamemode + "." + queueName, arenas);
+        saveQueuesConfig();
+        return true;
+    }
+
+    public ArrayList<String> getQueueNames(String gamemode) {
+        if (!getQueuesConfig().contains(gamemode)) return new ArrayList<>();
+        return new ArrayList<>(getQueuesConfig().getConfigurationSection(gamemode).getKeys(false));
+    }
+
+    public void reloadQueueSignsConfig() {
+        if (this.queueSignsConfigFile == null) {
+            this.queueSignsConfigFile = new File(this.dataFolder, "queue_signs.yml");
+        }
+        this.queueSignsConfig = YamlConfiguration.loadConfiguration(this.queueSignsConfigFile);
+        if (!this.queueSignsConfig.contains("signs")) this.queueSignsConfig.set("signs", new ArrayList<>());
+        this.saveQueueSignsConfig();
+    }
+
+    public void saveQueueSignsConfig() {
+        if (this.queueSignsConfig == null || this.queueSignsConfigFile == null) return;
+        try {
+            this.queueSignsConfig.save(this.queueSignsConfigFile);
+        } catch (IOException e) {
+            LogHandler.severe("Could not save queue_signs.yml", e);
+        }
+    }
+
+    public FileConfiguration getQueueSignsConfig() {
+        if (this.queueSignsConfig == null) this.reloadQueueSignsConfig();
+        return this.queueSignsConfig;
     }
 
     public void reloadArenaConfigs() {

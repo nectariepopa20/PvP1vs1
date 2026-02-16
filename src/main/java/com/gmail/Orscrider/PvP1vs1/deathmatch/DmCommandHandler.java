@@ -11,8 +11,11 @@ import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 public class DmCommandHandler implements CommandExecutor {
 
@@ -44,6 +47,8 @@ public class DmCommandHandler implements CommandExecutor {
                 return handleLeave(p);
             case "arena":
                 return handleArena(p, args);
+            case "queue":
+                return handleQueue(p, args);
             case "rjoin":
             case "randomjoin":
                 return handleRandomJoin(p);
@@ -161,6 +166,159 @@ public class DmCommandHandler implements CommandExecutor {
         }
         pl.messageParserDm("notInLobby", p);
         return true;
+    }
+
+    private boolean handleQueue(Player p, String[] args) {
+        if (args.length < 2) {
+            p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join> [args]");
+            return true;
+        }
+        String sub = args[1].toLowerCase();
+        switch (sub) {
+            case "create":
+                if (!p.hasPermission("dm.queue.create")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue create <name>");
+                    return true;
+                }
+                if (pl.getDataHandler().createQueue("dm", args[2])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GREEN + "Queue \"" + args[2] + "\" created.");
+                } else {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" already exists.");
+                }
+                return true;
+            case "delete":
+                if (!p.hasPermission("dm.queue.delete")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue delete <name>");
+                    return true;
+                }
+                if (pl.getDataHandler().deleteQueue("dm", args[2])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GREEN + "Queue \"" + args[2] + "\" deleted.");
+                } else {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                }
+                return true;
+            case "addarena":
+                if (!p.hasPermission("dm.queue.addarena")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 4) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue addarena <queue> <arena>");
+                    return true;
+                }
+                if (!pl.getDataHandler().queueExists("dm", args[2])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                    return true;
+                }
+                if (!pl.getDmArenaManager().arenaExists(args[3])) {
+                    replacements.put("{ARENA}", args[3]);
+                    pl.sendDmMessage("arenaDoesNotExist", p, replacements);
+                    return true;
+                }
+                if (pl.getDataHandler().addArenaToQueue("dm", args[2], args[3])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GREEN + "Arena \"" + args[3] + "\" added to queue \"" + args[2] + "\".");
+                } else {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Arena already in queue.");
+                }
+                return true;
+            case "remarena":
+                if (!p.hasPermission("dm.queue.remarena")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 4) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue remarena <queue> <arena>");
+                    return true;
+                }
+                if (pl.getDataHandler().remArenaFromQueue("dm", args[2], args[3])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GREEN + "Arena \"" + args[3] + "\" removed from queue \"" + args[2] + "\".");
+                } else {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue or arena not found.");
+                }
+                return true;
+            case "list":
+                if (!p.hasPermission("dm.queue.list")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                ArrayList<String> queues = pl.getDataHandler().getQueueNames("dm");
+                if (queues.isEmpty()) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GRAY + "No queues defined.");
+                    return true;
+                }
+                p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GOLD + "DM Queues:");
+                for (String q : queues) {
+                    List<String> arenas = pl.getDataHandler().getQueueArenas("dm", q);
+                    p.sendMessage(ChatColor.GREEN + "  " + q + ChatColor.GRAY + " (" + String.join(", ", arenas) + ")");
+                }
+                return true;
+            case "join":
+                if (!p.hasPermission("dm.queue.join")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue join <queue>");
+                    return true;
+                }
+                String queueName = args[2];
+                if (!pl.getDataHandler().queueExists("dm", queueName)) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue \"" + queueName + "\" does not exist.");
+                    return true;
+                }
+                List<String> arenaNames = pl.getDataHandler().getQueueArenas("dm", queueName);
+                ArrayList<String> joinable = new ArrayList<>();
+                for (String an : arenaNames) {
+                    if (!pl.getDmArenaManager().arenaExists(an)) continue;
+                    DmGameManager gm = pl.getDmArenaManager().getArena(an);
+                    if (!gm.isEnabled() || !gm.hasLobbySet()) continue;
+                    if (gm.getArenaStatus() != DmGameManager.DmArenaMode.NORMAL && gm.getArenaStatus() != DmGameManager.DmArenaMode.LOBBY) continue;
+                    if (gm.getLobbySize() >= gm.getMaxPlayers()) continue;
+                    if (gm.isInLobby(p) || gm.arenaPlayersContains(p)) {
+                        replacements.put("{ARENA}", an);
+                        pl.sendDmMessage("alreadyInLobby", p, replacements);
+                        return true;
+                    }
+                    joinable.add(an);
+                }
+                for (DmGameManager a : pl.getDmArenaManager().getArenas().values()) {
+                    if (a.isInLobby(p) || a.arenaPlayersContains(p)) {
+                        replacements.put("{ARENA}", a.getArenaName());
+                        pl.sendDmMessage("alreadyInLobby", p, replacements);
+                        return true;
+                    }
+                }
+                if (joinable.isEmpty()) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "No arena in queue \"" + queueName + "\" is available to join.");
+                    return true;
+                }
+                String chosen = null;
+                int maxCount = -1;
+                for (String an : joinable) {
+                    DmGameManager gm = pl.getDmArenaManager().getArena(an);
+                    int count = gm.getLobbySize() + gm.getArenaPlayers().size();
+                    if (count > maxCount) {
+                        maxCount = count;
+                        chosen = an;
+                    }
+                }
+                if (maxCount == 0) {
+                    chosen = joinable.get(new Random().nextInt(joinable.size()));
+                }
+                p.chat("/dm join " + chosen);
+                return true;
+            default:
+                p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join> [args]");
+                return true;
+        }
     }
 
     private boolean handleRandomJoin(Player p) {
@@ -539,6 +697,7 @@ public class DmCommandHandler implements CommandExecutor {
         p.sendMessage(ChatColor.GOLD + "========== Deathmatch ==========");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm join <arena>");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm leave");
+        p.sendMessage(ChatColor.DARK_GREEN + "  /dm queue <create|delete|addarena|remarena|list|join>");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm stats [player]");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm forcestart");
         p.sendMessage(ChatColor.DARK_GREEN + "  /dm arena ...");

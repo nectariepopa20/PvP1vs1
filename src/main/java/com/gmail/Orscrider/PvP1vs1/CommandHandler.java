@@ -26,11 +26,13 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -75,9 +77,16 @@ implements CommandExecutor {
                                     }
                                     if (!(sender instanceof Player)) return false;
                                     p = (Player)sender;
-                                    if (args.length > 4 || args.length == 0) {
+                                    if (args.length == 0) {
                                         this.wrongCommandUsage(p);
                                         return true;
+                                    }
+                                    if (args.length > 4 && !(args[0].equalsIgnoreCase("queue") && args.length <= 5)) {
+                                        this.wrongCommandUsage(p);
+                                        return true;
+                                    }
+                                    if (args[0].equalsIgnoreCase("queue")) {
+                                        return this.handle1v1Queue(p, args);
                                     }
                                     if (args[0].equalsIgnoreCase("reload")) {
                                         if (!p.hasPermission("1vs1.reload")) {
@@ -714,6 +723,164 @@ implements CommandExecutor {
             p.sendMessage(msg);
         }
         return true;
+    }
+
+    private boolean handle1v1Queue(Player p, String[] args) {
+        if (args.length < 2) {
+            p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join> [args]");
+            return true;
+        }
+        String sub = args[1].toLowerCase();
+        switch (sub) {
+            case "create":
+                if (!p.hasPermission("1vs1.queue.create")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue create <name>");
+                    return true;
+                }
+                if (this.pl.getDataHandler().createQueue("1v1", args[2])) {
+                    this.replacements.put("{QUEUE}", args[2]);
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.GREEN + "Queue \"" + args[2] + "\" created.");
+                } else {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" already exists.");
+                }
+                return true;
+            case "delete":
+                if (!p.hasPermission("1vs1.queue.delete")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue delete <name>");
+                    return true;
+                }
+                if (this.pl.getDataHandler().deleteQueue("1v1", args[2])) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.GREEN + "Queue \"" + args[2] + "\" deleted.");
+                } else {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                }
+                return true;
+            case "addarena":
+                if (!p.hasPermission("1vs1.queue.addarena")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 4) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue addarena <queue> <arena>");
+                    return true;
+                }
+                if (!this.pl.getDataHandler().queueExists("1v1", args[2])) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                    return true;
+                }
+                if (!this.pl.getArenaManager().arenaExists(args[3])) {
+                    this.replacements.put("{ARENA}", args[3]);
+                    this.pl.send1vs1Message("arenaDoesNotExist", p, this.replacements);
+                    return true;
+                }
+                if (this.pl.getDataHandler().addArenaToQueue("1v1", args[2], args[3])) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.GREEN + "Arena \"" + args[3] + "\" added to queue \"" + args[2] + "\".");
+                } else {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Arena already in queue.");
+                }
+                return true;
+            case "remarena":
+                if (!p.hasPermission("1vs1.queue.remarena")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 4) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue remarena <queue> <arena>");
+                    return true;
+                }
+                if (this.pl.getDataHandler().remArenaFromQueue("1v1", args[2], args[3])) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.GREEN + "Arena \"" + args[3] + "\" removed from queue \"" + args[2] + "\".");
+                } else {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue or arena not found.");
+                }
+                return true;
+            case "list":
+                if (!p.hasPermission("1vs1.queue.list")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                ArrayList<String> queues = this.pl.getDataHandler().getQueueNames("1v1");
+                if (queues.isEmpty()) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.GRAY + "No queues defined.");
+                    return true;
+                }
+                p.sendMessage(this.pl.getPrefix() + ChatColor.GOLD + "1v1 Queues:");
+                for (String q : queues) {
+                    List<String> arenas = this.pl.getDataHandler().getQueueArenas("1v1", q);
+                    p.sendMessage(ChatColor.GREEN + "  " + q + ChatColor.GRAY + " (" + String.join(", ", arenas) + ")");
+                }
+                return true;
+            case "join":
+                if (!p.hasPermission("1vs1.queue.join")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length != 3) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue join <queue>");
+                    return true;
+                }
+                String queueName = args[2];
+                if (!this.pl.getDataHandler().queueExists("1v1", queueName)) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue \"" + queueName + "\" does not exist.");
+                    return true;
+                }
+                List<String> arenaNames = this.pl.getDataHandler().getQueueArenas("1v1", queueName);
+                ArrayList<String> joinable = new ArrayList<>();
+                for (String an : arenaNames) {
+                    if (!this.pl.getArenaManager().arenaExists(an)) continue;
+                    GameManager gm = this.pl.getArenaManager().getArena(an);
+                    if (!gm.isEnabled() || !gm.hasLobbySet()) continue;
+                    GameManager.arenaMode st = gm.getArenaStatus();
+                    if (st == GameManager.arenaMode.COUNTDOWN_LOBBY || st == GameManager.arenaMode.PREPERATION_BEFORE_FIGHT
+                            || st == GameManager.arenaMode.COUNTDOWN_BEFORE_FIGHT || st == GameManager.arenaMode.FIGHT
+                            || st == GameManager.arenaMode.BETWEEN_ROUNDS) continue;
+                    if (gm.getLobbySize() >= 2) continue;
+                    if (gm.isInLobby(p) || gm.arenaPlayersContains(p)) {
+                        this.replacements.put("{ARENA}", an);
+                        this.pl.send1vs1Message("alreadyInLobby", p, this.replacements);
+                        return true;
+                    }
+                    joinable.add(an);
+                }
+                for (Map.Entry<String, GameManager> e : this.pl.getArenaManager().getArenas().entrySet()) {
+                    if (e.getValue().isInLobby(p) || e.getValue().arenaPlayersContains(p)) {
+                        this.replacements.put("{ARENA}", e.getKey());
+                        this.pl.send1vs1Message("alreadyInLobby", p, this.replacements);
+                        return true;
+                    }
+                }
+                if (joinable.isEmpty()) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "No arena in queue \"" + queueName + "\" is available to join.");
+                    return true;
+                }
+                String chosen = null;
+                int maxCount = -1;
+                for (String an : joinable) {
+                    GameManager gm = this.pl.getArenaManager().getArena(an);
+                    int count = gm.getLobbySize();
+                    if (gm.getArenaStatus() != GameManager.arenaMode.NORMAL && gm.getArenaStatus() != GameManager.arenaMode.LOBBY) count += 2;
+                    if (count > maxCount) {
+                        maxCount = count;
+                        chosen = an;
+                    }
+                }
+                if (chosen == null || maxCount == 0) {
+                    chosen = joinable.get(new Random().nextInt(joinable.size()));
+                }
+                p.chat("/1vs1 join " + chosen);
+                return true;
+            default:
+                p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join> [args]");
+                return true;
+        }
     }
 
     private void wrongCommandUsage(Player p) {
