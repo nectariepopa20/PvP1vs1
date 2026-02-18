@@ -264,6 +264,7 @@ implements Listener {
                 }
                 if (!arena.getValue().arenaPlayersContains(p) || !(ev.getFinalDamage() >= p.getHealth())) continue;
                 ev.setCancelled(true);
+                this.pl.playDeathLightning(p.getLocation());
                 Player winner = p == arena.getValue().getArenaPlayers()[0] ? arena.getValue().getArenaPlayers()[1] : arena.getValue().getArenaPlayers()[0];
                 arena.getValue().setRoundWinner(winner);
             }

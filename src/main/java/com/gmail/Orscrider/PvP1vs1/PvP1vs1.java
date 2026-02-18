@@ -29,10 +29,14 @@ import com.gmail.Orscrider.PvP1vs1.persistence.DBMigrationHandler;
 import com.gmail.Orscrider.PvP1vs1.placeholders.PvP1vs1Placeholders;
 import com.gmail.Orscrider.PvP1vs1.signs.SignManager;
 import com.gmail.Orscrider.PvP1vs1.util.LogHandler;
+import com.gmail.Orscrider.PvP1vs1.util.TitleHelper;
 import com.gmail.Orscrider.PvP1vs1.util.Updater;
 import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
+import org.bukkit.Location;
+import org.bukkit.Sound;
+import org.bukkit.World;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandExecutor;
@@ -165,6 +169,64 @@ extends JavaPlugin {
 
     public void messageParserDm(String configPath, Player p) {
         this.sendDmMessage(configPath, p, null);
+    }
+
+    /**
+     * Send a title from 1v1 messages config. stay = min(config duration, maxStayTicks).
+     */
+    public void send1vs1Title(Player p, String titleKey, String subtitleKey, HashMap<String, String> replacements, int maxStayTicks) {
+        if (p == null || !p.isOnline()) return;
+        String title = this.dataHandler.getMessagesConfig().getString(titleKey);
+        String subtitle = this.dataHandler.getMessagesConfig().getString(subtitleKey);
+        if (title == null) title = "";
+        if (subtitle == null) subtitle = "";
+        if (replacements != null) {
+            for (Map.Entry<String, String> e : replacements.entrySet()) {
+                title = title.replace(e.getKey(), e.getValue());
+                subtitle = subtitle.replace(e.getKey(), e.getValue());
+            }
+        }
+        int durationTicks = this.getConfig().getInt("titles.durationSeconds", 5) * 20;
+        int stay = Math.min(durationTicks, Math.max(20, maxStayTicks));
+        int fadeIn = this.getConfig().getInt("titles.fadeInTicks", 10);
+        int fadeOut = this.getConfig().getInt("titles.fadeOutTicks", 10);
+        TitleHelper.sendTitle(p, title, subtitle, fadeIn, stay, fadeOut);
+    }
+
+    /**
+     * Send a title from DM messages config. stay = min(config duration, maxStayTicks).
+     */
+    public void sendDmTitle(Player p, String titleKey, String subtitleKey, HashMap<String, String> replacements, int maxStayTicks) {
+        if (p == null || !p.isOnline()) return;
+        String title = this.dataHandler.getDmMessagesConfig().getString(titleKey, "");
+        String subtitle = this.dataHandler.getDmMessagesConfig().getString(subtitleKey, "");
+        if (replacements != null) {
+            for (Map.Entry<String, String> e : replacements.entrySet()) {
+                title = title.replace(e.getKey(), e.getValue());
+                subtitle = subtitle.replace(e.getKey(), e.getValue());
+            }
+        }
+        int durationTicks = this.getConfig().getInt("titles.durationSeconds", 5) * 20;
+        int stay = Math.min(durationTicks, Math.max(20, maxStayTicks));
+        int fadeIn = this.getConfig().getInt("titles.fadeInTicks", 10);
+        int fadeOut = this.getConfig().getInt("titles.fadeOutTicks", 10);
+        TitleHelper.sendTitle(p, title, subtitle, fadeIn, stay, fadeOut);
+    }
+
+    /**
+     * Cosmetic lightning at death location: effect only, no fire or damage.
+     */
+    public void playDeathLightning(Location loc) {
+        if (loc == null || loc.getWorld() == null) return;
+        World w = loc.getWorld();
+        w.strikeLightningEffect(loc);
+        try {
+            w.playSound(loc, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.6f, 1f);
+        } catch (NoSuchFieldError | IllegalArgumentException ignored) {
+            try {
+                w.playSound(loc, Sound.valueOf("LIGHTNING"), 0.6f, 1f);
+            } catch (Exception ignored2) {}
+        }
     }
 
     protected boolean setupEconomy() {

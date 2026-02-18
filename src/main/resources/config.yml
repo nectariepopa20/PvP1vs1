@@ -1,5 +1,9 @@
 arenaSignUpdater:
   delay: 20
+titles:
+  durationSeconds: 5
+  fadeInTicks: 10
+  fadeOutTicks: 10
 prefix: '&4[&6&l1vs1&4]&r '
 duelInvitationTimeOut: 60
 checkForUpdates: true

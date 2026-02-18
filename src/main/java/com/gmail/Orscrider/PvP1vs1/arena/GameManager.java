@@ -64,6 +64,7 @@ public class GameManager {
     private HashMap<String, ValueContainer> valueContMap = new HashMap();
     private Player postGameLoser = null;
     private int winningTimerTaskId = -1;
+    private int betweenRoundsTaskId = -1;
 
     public GameManager(PvP1vs1 plugin, String arenaName) {
         this.pl = plugin;
@@ -145,11 +146,22 @@ public class GameManager {
     }
 
     public void afterFight(Player winner) {
+        if (this.betweenRoundsTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(this.betweenRoundsTaskId);
+            this.betweenRoundsTaskId = -1;
+        }
         Player loser = winner == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0];
+        int winningTimerSec = this.getArenaConfig().getInt("winningTimer", 10);
+        int titleStayTicks = Math.min(this.pl.getConfig().getInt("titles.durationSeconds", 5) * 20, winningTimerSec * 20);
+        HashMap<String, String> winRep = new HashMap<>();
+        winRep.put("{loserName}", loser.getName());
+        this.pl.send1vs1Title(winner, "victoryTitle", "victorySubtitle", winRep, titleStayTicks);
+        HashMap<String, String> loseRep = new HashMap<>();
+        loseRep.put("{winnerName}", winner.getName());
+        this.pl.send1vs1Title(loser, "gameOverTitle", "gameOverSubtitle", loseRep, titleStayTicks);
         if (this.getArenaConfig().getBoolean("winAnnouncement")) {
             Bukkit.broadcastMessage((String)(this.pl.getPrefix() + ChatColor.translateAlternateColorCodes((char)'&', (String)this.pl.getDataHandler().getMessagesConfig().getString("winAnnounce")).replace("{WINNER}", winner.getName()).replace("{LOSER}", loser.getName()).replace("{ARENA}", this.arenaName)));
         }
-        int winningTimerSec = this.getArenaConfig().getInt("winningTimer", 10);
         this.setArenaStatus(arenaMode.WINNING_TIMER);
         this.postGameLoser = loser;
         this.timeOut.cancelTimeOut();
@@ -452,6 +464,10 @@ public class GameManager {
             Bukkit.getScheduler().cancelTask(this.winningTimerTaskId);
             this.winningTimerTaskId = -1;
         }
+        if (this.betweenRoundsTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(this.betweenRoundsTaskId);
+            this.betweenRoundsTaskId = -1;
+        }
     }
 
     public boolean isGameOver(Player winner) {
@@ -462,6 +478,13 @@ public class GameManager {
     }
 
     public void startRound(Player winner) {
+        Player loser = winner == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0];
+        int winningTimerSec = this.getArenaConfig().getInt("winningTimer", 10);
+        int titleStayTicks = Math.min(this.pl.getConfig().getInt("titles.durationSeconds", 5) * 20, winningTimerSec * 20);
+        HashMap<String, String> titleRep = new HashMap<>();
+        titleRep.put("{endRoundTimer}", String.valueOf(winningTimerSec));
+        this.pl.send1vs1Title(winner, "roundWonTitle", "roundWonSubtitle", titleRep, titleStayTicks);
+        this.pl.send1vs1Title(loser, "roundLostTitle", "roundLostSubtitle", titleRep, titleStayTicks);
         HashMap<String, String> replacements = new HashMap<String, String>();
         replacements.put("{WINNER}", winner.getName());
         replacements.put("{ROUND}", String.valueOf(this.getCurrentRound() - 1));
@@ -470,7 +493,22 @@ public class GameManager {
         for (Player player : this.arenaPlayers) {
             this.pl.send1vs1Message("wonRound", player, replacements);
         }
-        this.readyPlayers();
+        loser.closeInventory();
+        if (loser.isInsideVehicle()) loser.leaveVehicle();
+        loser.teleport(this.getLobbyLocation(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+        loser.getInventory().clear();
+        loser.updateInventory();
+        loser.setGameMode(GameMode.ADVENTURE);
+        loser.setFlying(false);
+        final Player winRef = winner;
+        final Player loseRef = loser;
+        this.betweenRoundsTaskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin) this.pl, new Runnable() {
+            @Override
+            public void run() {
+                GameManager.this.betweenRoundsTaskId = -1;
+                GameManager.this.readyPlayers();
+            }
+        }, winningTimerSec * 20L);
     }
 
     public void endGame(Player winner) {

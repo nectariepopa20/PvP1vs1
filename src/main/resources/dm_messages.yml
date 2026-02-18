@@ -23,6 +23,12 @@ afterPlayerFreezing: '&aIt is time to fight!'
 
 # Fight / result
 deathBroadcast: '&c{X} &7killed &c{Y}'
+youDiedTitle: '&c&lYOU DIED!'
+youDiedSubtitle: '&7You were killed by {killerName}'
+dmGameOverTitle: '&c&lGAME OVER!'
+dmGameOverSubtitle: '&7The winner is {winnerName}'
+dmVictoryTitle: '&6&lVICTORY!'
+dmVictorySubtitle: '&7Congratulations, {winnerName}'
 winAnnounce: '&c{WINNER} &awon the deathmatch in arena &6{ARENA}'
 timeLeft: '&aTime left: &6{TIME_LEFT} &aseconds'
 timeOut: '&cThe battle took too long'

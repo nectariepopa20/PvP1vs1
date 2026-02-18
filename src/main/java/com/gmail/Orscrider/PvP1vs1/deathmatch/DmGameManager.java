@@ -378,6 +378,7 @@ public class DmGameManager {
     }
 
     public void onPlayerDeath(Player dead, Player killer) {
+        pl.playDeathLightning(dead.getLocation());
         DBConnectionController db = DBConnectionController.getInstance();
         if (dead != null) {
             db.addPlayerDmDeath(dead.getUniqueId().toString());
@@ -401,6 +402,23 @@ public class DmGameManager {
         }
         updateAllListNames();
         arenaPlayers.remove(dead);
+        int winningTimerSec = getArenaConfig().getInt("winningTimer", 10);
+        int titleStayTicks = Math.min(pl.getConfig().getInt("titles.durationSeconds", 5) * 20, winningTimerSec * 20);
+        if (arenaPlayers.size() > 1) {
+            HashMap<String, String> youDiedRep = new HashMap<>();
+            youDiedRep.put("{killerName}", killer != null && killer != dead ? killer.getName() : "?");
+            pl.sendDmTitle(dead, "youDiedTitle", "youDiedSubtitle", youDiedRep, titleStayTicks);
+        } else {
+            Player winner = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
+            HashMap<String, String> gameOverRep = new HashMap<>();
+            gameOverRep.put("{winnerName}", winner != null ? winner.getName() : "?");
+            pl.sendDmTitle(dead, "dmGameOverTitle", "dmGameOverSubtitle", gameOverRep, titleStayTicks);
+            if (winner != null && winner.isOnline()) {
+                HashMap<String, String> victoryRep = new HashMap<>();
+                victoryRep.put("{winnerName}", winner.getName());
+                pl.sendDmTitle(winner, "dmVictoryTitle", "dmVictorySubtitle", victoryRep, titleStayTicks);
+            }
+        }
         teleportToLobbyAsSpectator(dead);
         if (arenaPlayers.size() <= 1) {
             Player winner = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
