@@ -404,22 +404,28 @@ public class DmGameManager {
         arenaPlayers.remove(dead);
         int winningTimerSec = getArenaConfig().getInt("winningTimer", 10);
         int titleStayTicks = Math.min(pl.getConfig().getInt("titles.durationSeconds", 5) * 20, winningTimerSec * 20);
-        if (arenaPlayers.size() > 1) {
-            HashMap<String, String> youDiedRep = new HashMap<>();
-            youDiedRep.put("{killerName}", killer != null && killer != dead ? killer.getName() : "?");
-            pl.sendDmTitle(dead, "youDiedTitle", "youDiedSubtitle", youDiedRep, titleStayTicks);
-        } else {
-            Player winner = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
-            HashMap<String, String> gameOverRep = new HashMap<>();
-            gameOverRep.put("{winnerName}", winner != null ? winner.getName() : "?");
-            pl.sendDmTitle(dead, "dmGameOverTitle", "dmGameOverSubtitle", gameOverRep, titleStayTicks);
-            if (winner != null && winner.isOnline()) {
-                HashMap<String, String> victoryRep = new HashMap<>();
-                victoryRep.put("{winnerName}", winner.getName());
-                pl.sendDmTitle(winner, "dmVictoryTitle", "dmVictorySubtitle", victoryRep, titleStayTicks);
-            }
-        }
+        final Player deadRef = dead;
+        final Player killerRef = killer;
+        final boolean isLastDeath = arenaPlayers.size() <= 1;
+        final Player winnerRef = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
         teleportToLobbyAsSpectator(dead);
+        Bukkit.getScheduler().runTaskLater((Plugin) pl, () -> {
+            if (deadRef == null || !deadRef.isOnline()) return;
+            if (isLastDeath) {
+                HashMap<String, String> gameOverRep = new HashMap<>();
+                gameOverRep.put("{winnerName}", winnerRef != null ? winnerRef.getName() : "?");
+                pl.sendDmTitle(deadRef, "dmGameOverTitle", "dmGameOverSubtitle", gameOverRep, titleStayTicks);
+                if (winnerRef != null && winnerRef.isOnline()) {
+                    HashMap<String, String> victoryRep = new HashMap<>();
+                    victoryRep.put("{winnerName}", winnerRef.getName());
+                    pl.sendDmTitle(winnerRef, "dmVictoryTitle", "dmVictorySubtitle", victoryRep, titleStayTicks);
+                }
+            } else {
+                HashMap<String, String> youDiedRep = new HashMap<>();
+                youDiedRep.put("{killerName}", killerRef != null && killerRef != deadRef ? killerRef.getName() : "?");
+                pl.sendDmTitle(deadRef, "youDiedTitle", "youDiedSubtitle", youDiedRep, titleStayTicks);
+            }
+        }, 10L);
         if (arenaPlayers.size() <= 1) {
             Player winner = arenaPlayers.isEmpty() ? null : arenaPlayers.get(0);
             startWinningPhase(winner);

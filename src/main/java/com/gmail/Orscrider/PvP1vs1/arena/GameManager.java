@@ -480,11 +480,6 @@ public class GameManager {
     public void startRound(Player winner) {
         Player loser = winner == this.arenaPlayers[0] ? this.arenaPlayers[1] : this.arenaPlayers[0];
         int winningTimerSec = this.getArenaConfig().getInt("winningTimer", 10);
-        int titleStayTicks = Math.min(this.pl.getConfig().getInt("titles.durationSeconds", 5) * 20, winningTimerSec * 20);
-        HashMap<String, String> titleRep = new HashMap<>();
-        titleRep.put("{endRoundTimer}", String.valueOf(winningTimerSec));
-        this.pl.send1vs1Title(winner, "roundWonTitle", "roundWonSubtitle", titleRep, titleStayTicks);
-        this.pl.send1vs1Title(loser, "roundLostTitle", "roundLostSubtitle", titleRep, titleStayTicks);
         HashMap<String, String> replacements = new HashMap<String, String>();
         replacements.put("{WINNER}", winner.getName());
         replacements.put("{ROUND}", String.valueOf(this.getCurrentRound() - 1));
@@ -502,13 +497,24 @@ public class GameManager {
         loser.setFlying(false);
         final Player winRef = winner;
         final Player loseRef = loser;
-        this.betweenRoundsTaskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin) this.pl, new Runnable() {
+        final int[] remainingSec = new int[]{winningTimerSec};
+        this.betweenRoundsTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask((Plugin) this.pl, new Runnable() {
             @Override
             public void run() {
-                GameManager.this.betweenRoundsTaskId = -1;
-                GameManager.this.readyPlayers();
+                if (remainingSec[0] <= 0) {
+                    Bukkit.getScheduler().cancelTask(GameManager.this.betweenRoundsTaskId);
+                    GameManager.this.betweenRoundsTaskId = -1;
+                    GameManager.this.readyPlayers();
+                    return;
+                }
+                HashMap<String, String> titleRep = new HashMap<>();
+                titleRep.put("{endRoundTimer}", String.valueOf(remainingSec[0]));
+                int stayTicks = 20;
+                GameManager.this.pl.send1vs1Title(winRef, "roundWonTitle", "roundWonSubtitle", titleRep, stayTicks);
+                GameManager.this.pl.send1vs1Title(loseRef, "roundLostTitle", "roundLostSubtitle", titleRep, stayTicks);
+                remainingSec[0]--;
             }
-        }, winningTimerSec * 20L);
+        }, 0L, 20L);
     }
 
     public void endGame(Player winner) {

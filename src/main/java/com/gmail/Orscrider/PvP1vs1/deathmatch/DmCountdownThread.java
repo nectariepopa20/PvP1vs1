@@ -135,10 +135,12 @@ public class DmCountdownThread extends Thread {
 
     private void playSound(Player p) {
         Sound sound = null;
-        try { sound = Sound.valueOf("ENTITY_EXPERIENCE_ORB_TOUCH"); }
-        catch (IllegalArgumentException e) {
-            try { sound = Sound.valueOf("SUCCESSFUL_HIT"); } catch (IllegalArgumentException ignored) {}
+        for (String name : new String[]{"ENTITY_EXPERIENCE_ORB_PICKUP", "ENTITY_EXPERIENCE_ORB_TOUCH", "BLOCK_NOTE_BLOCK_PLING", "SUCCESSFUL_HIT"}) {
+            try {
+                sound = Sound.valueOf(name);
+                break;
+            } catch (IllegalArgumentException ignored) {}
         }
-        if (sound != null) p.playSound(p.getLocation(), sound, 200.0f, 0.0f);
+        if (sound != null) p.playSound(p.getLocation(), sound, 0.8f, 1.0f);
     }
 }
