@@ -6,7 +6,6 @@
  */
 package com.gmail.Orscrider.PvP1vs1.arena;
 
-import com.gmail.Orscrider.PvP1vs1.Broadcaster;
 import com.gmail.Orscrider.PvP1vs1.PvP1vs1;
 import com.gmail.Orscrider.PvP1vs1.arena.GameManager;
 import com.gmail.Orscrider.PvP1vs1.metrics.MetricsHandler;
@@ -26,9 +25,6 @@ public class ArenaManager {
         this.pl = plugin;
         for (String arenaName : this.pl.getDataHandler().getArenaNames()) {
             this.arenas.put(arenaName, new GameManager(plugin, arenaName));
-        }
-        if (this.pl.getConfig().getBoolean("broadcaster.enabled")) {
-            new Broadcaster(this, this.pl);
         }
     }
 

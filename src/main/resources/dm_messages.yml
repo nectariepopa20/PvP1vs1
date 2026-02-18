@@ -13,6 +13,9 @@ playerJoinedLobby: '&a{PLAYER} has joined the game ({COUNT}/{MAX})'
 playerLeftLobby: '&a{PLAYER} has left the game ({COUNT}/{MAX})'
 
 # Countdown
+lobbyCountdownStarted: '&aGame starting in &6{DURATION} &aseconds. More players may join! (&6{COUNT}&a/&6{MAX}&a)'
+lobbyCountdownShortened: '&aEnough players! Starting in &6{COUNTDOWN} &aseconds.'
+lobbyCountdownCancelled: '&cNot enough players. Countdown cancelled.'
 countdownLobby: '&aYou will be teleported into the arena in &6{COUNTDOWN} &aseconds'
 getTeleportedIntoArena: '&aGet ready for fighting!'
 countdownBeforeFight: '&aFight starts in &6{COUNTDOWN} &aseconds'

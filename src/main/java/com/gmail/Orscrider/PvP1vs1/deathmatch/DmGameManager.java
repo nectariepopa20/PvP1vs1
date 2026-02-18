@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manages a single deathmatch arena: lobby, countdown, spawns, and fight.
@@ -51,6 +52,8 @@ public class DmGameManager {
     private boolean enabled = true;
     private DmTimeOut dmTimeOut;
     private int winningTimerTaskId = -1;
+    private int lobbyCountdownTaskId = -1;
+    private final AtomicInteger lobbyCountdownRemaining = new AtomicInteger(0);
 
     public DmGameManager(PvP1vs1 plugin, String arenaName) {
         this.pl = plugin;
@@ -66,6 +69,27 @@ public class DmGameManager {
 
     public int getMaxPlayers() {
         return getArenaConfig().getInt("maxPlayers", 8);
+    }
+
+    public int getBareMinimumPlayers() {
+        int max = getMaxPlayers();
+        int bare = getArenaConfig().getInt("bareMinimumPlayers", 2);
+        return Math.max(1, Math.min(bare, max - 1));
+    }
+
+    public int getOptimalMinimumPlayers() {
+        int max = getMaxPlayers();
+        int bare = getBareMinimumPlayers();
+        int optimal = getArenaConfig().getInt("optimalMinimumPlayers", Math.max(bare, max - 1));
+        return Math.max(bare, Math.min(optimal, max));
+    }
+
+    public int getLobbyCountdownDurationBare() {
+        return getArenaConfig().getInt("countdown.lobby.durationBare", 60);
+    }
+
+    public int getLobbyCountdownDurationOptimal() {
+        return getArenaConfig().getInt("countdown.lobby.durationOptimal", 10);
     }
 
     public boolean hasLobbySet() {
@@ -103,6 +127,7 @@ public class DmGameManager {
         p.updateInventory();
         p.setGameMode(GameMode.ADVENTURE);
         p.setFlying(false);
+        startLobbyCountdownIfNeeded();
     }
 
     public void leaveLobby(Player p) {
@@ -116,9 +141,14 @@ public class DmGameManager {
         }
         if (lobbyPlayers.isEmpty()) {
             setArenaStatus(DmArenaMode.NORMAL);
+            cancelLobbyCountdown();
         } else {
             setArenaStatus(DmArenaMode.LOBBY);
             broadcastPlayerLeftLobby(leftName);
+            if (lobbyPlayers.size() < getBareMinimumPlayers()) {
+                cancelLobbyCountdown();
+                setArenaStatus(DmArenaMode.LOBBY);
+            }
         }
     }
 
@@ -129,9 +159,14 @@ public class DmGameManager {
         valueContMap.remove(p.getName());
         if (lobbyPlayers.isEmpty()) {
             setArenaStatus(DmArenaMode.NORMAL);
+            cancelLobbyCountdown();
         } else {
             setArenaStatus(DmArenaMode.LOBBY);
             broadcastPlayerLeftLobby(leftName);
+            if (lobbyPlayers.size() < getBareMinimumPlayers()) {
+                cancelLobbyCountdown();
+                setArenaStatus(DmArenaMode.LOBBY);
+            }
         }
     }
 
@@ -159,18 +194,105 @@ public class DmGameManager {
         }
     }
 
+    /**
+     * Called when a player joins the lobby. Starts the lobby countdown when we reach
+     * bareMinimumPlayers (with longer duration), or shortens it when we reach optimalMinimumPlayers.
+     */
     public void startGame() {
-        int max = getMaxPlayers();
-        if (lobbyPlayers.size() >= max && getArenaStatus() == DmArenaMode.LOBBY) {
-            boolean lobbyCountdown = getArenaConfig().getBoolean("countdown.lobby.enabled", true);
-            if (lobbyCountdown) {
-                DmCountdownThread thread = new DmCountdownThread(pl, this, DmCountdownThread.DmCountdownType.BEFORE_TELEPORT);
-                thread.start();
-            } else {
-                Player[] players = lobbyPlayers.subList(0, max).toArray(new Player[0]);
-                joinArena(players);
+        startLobbyCountdownIfNeeded();
+    }
+
+    private void startLobbyCountdownIfNeeded() {
+        if (getArenaStatus() != DmArenaMode.LOBBY && getArenaStatus() != DmArenaMode.COUNTDOWN_LOBBY) return;
+        if (!getArenaConfig().getBoolean("countdown.lobby.enabled", true)) return;
+        int size = lobbyPlayers.size();
+        int bare = getBareMinimumPlayers();
+        if (size < bare) return;
+
+        if (lobbyCountdownTaskId == -1) {
+            setArenaStatus(DmArenaMode.COUNTDOWN_LOBBY);
+            lobbyCountdownRemaining.set(getLobbyCountdownDurationBare());
+            for (Player p : lobbyPlayers) {
+                if (p != null && p.isOnline()) {
+                    HashMap<String, String> reps = new HashMap<>();
+                    reps.put("{COUNT}", String.valueOf(size));
+                    reps.put("{MAX}", String.valueOf(getMaxPlayers()));
+                    reps.put("{DURATION}", String.valueOf(getLobbyCountdownDurationBare()));
+                    pl.sendDmMessage("lobbyCountdownStarted", p, reps);
+                }
+            }
+            lobbyCountdownTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask((Plugin) pl, this::lobbyCountdownTick, 20L, 20L);
+        } else if (size >= getOptimalMinimumPlayers()) {
+            int optimalDuration = getLobbyCountdownDurationOptimal();
+            int current = lobbyCountdownRemaining.get();
+            if (current > optimalDuration) {
+                lobbyCountdownRemaining.set(optimalDuration);
+                for (Player p : lobbyPlayers) {
+                    if (p != null && p.isOnline()) {
+                        HashMap<String, String> reps = new HashMap<>();
+                        reps.put("{COUNTDOWN}", String.valueOf(optimalDuration));
+                        pl.sendDmMessage("lobbyCountdownShortened", p, reps);
+                    }
+                }
             }
         }
+    }
+
+    private void lobbyCountdownTick() {
+        if (getArenaStatus() != DmArenaMode.COUNTDOWN_LOBBY || lobbyCountdownTaskId < 0) return;
+        int size = lobbyPlayers.size();
+        if (size < getBareMinimumPlayers()) {
+            cancelLobbyCountdown();
+            setArenaStatus(DmArenaMode.LOBBY);
+            for (Player p : lobbyPlayers) {
+                if (p != null && p.isOnline()) pl.sendDmMessage("lobbyCountdownCancelled", p, new HashMap<>());
+            }
+            return;
+        }
+        if (size >= getOptimalMinimumPlayers()) {
+            int opt = getLobbyCountdownDurationOptimal();
+            int cur = lobbyCountdownRemaining.get();
+            if (cur > opt) lobbyCountdownRemaining.set(opt);
+        }
+        int remaining = lobbyCountdownRemaining.decrementAndGet();
+        FileConfiguration cfg = getArenaConfig();
+        HashMap<String, String> replacements = new HashMap<>();
+        if (remaining == 10 || remaining == 5 || remaining == 4 || remaining == 3 || remaining == 2 || remaining == 1) {
+            replacements.put("{COUNTDOWN}", String.valueOf(remaining));
+            for (Player p : lobbyPlayers) {
+                if (p != null && p.isOnline()) {
+                    pl.sendDmMessage("countdownLobby", p, replacements);
+                    if (cfg.getBoolean("countdown.lobby.sound", true)) playLobbyCountdownSound(p);
+                }
+            }
+        }
+        if (remaining <= 0) {
+            cancelLobbyCountdown();
+            int max = getMaxPlayers();
+            int take = Math.min(lobbyPlayers.size(), max);
+            Player[] players = lobbyPlayers.subList(0, take).toArray(new Player[0]);
+            for (Player p : players) {
+                if (p != null && p.isOnline()) pl.messageParserDm("getTeleportedIntoArena", p);
+            }
+            joinArena(players);
+        }
+    }
+
+    private void playLobbyCountdownSound(Player p) {
+        org.bukkit.Sound sound = null;
+        try { sound = org.bukkit.Sound.valueOf("ENTITY_EXPERIENCE_ORB_TOUCH"); }
+        catch (IllegalArgumentException e) {
+            try { sound = org.bukkit.Sound.valueOf("BLOCK_NOTE_BLOCK_PLING"); } catch (IllegalArgumentException ignored) {}
+        }
+        if (sound != null) p.playSound(p.getLocation(), sound, 0.5f, 1f);
+    }
+
+    public void cancelLobbyCountdown() {
+        if (lobbyCountdownTaskId >= 0) {
+            Bukkit.getScheduler().cancelTask(lobbyCountdownTaskId);
+            lobbyCountdownTaskId = -1;
+        }
+        lobbyCountdownRemaining.set(0);
     }
 
     /**
@@ -179,8 +301,9 @@ public class DmGameManager {
      * @return true if started, false if not enough players
      */
     public boolean forceStartGame() {
-        if (getArenaStatus() != DmArenaMode.LOBBY) return false;
+        if (getArenaStatus() != DmArenaMode.LOBBY && getArenaStatus() != DmArenaMode.COUNTDOWN_LOBBY) return false;
         if (lobbyPlayers.size() < 2) return false;
+        cancelLobbyCountdown();
         int take = Math.min(lobbyPlayers.size(), getMaxPlayers());
         Player[] players = lobbyPlayers.subList(0, take).toArray(new Player[0]);
         joinArena(players);
@@ -429,6 +552,7 @@ public class DmGameManager {
     }
 
     public void reset() {
+        cancelLobbyCountdown();
         arenaStatus = lobbyPlayers.isEmpty() ? DmArenaMode.NORMAL : DmArenaMode.LOBBY;
         dmTimeOut.resetTimeOut();
         arenaPlayers.clear();

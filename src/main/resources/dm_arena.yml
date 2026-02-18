@@ -1,6 +1,10 @@
 # Deathmatch arena default configuration
 enabled: true
 maxPlayers: 8
+# Minimum players: at bareMinimumPlayers the lobby countdown starts (with longer duration).
+# At optimalMinimumPlayers the countdown shortens so the game starts quickly. bare < optimal.
+bareMinimumPlayers: 2
+optimalMinimumPlayers: 7
 lobby:
   world: world
   x: 0
@@ -11,7 +15,8 @@ lobby:
 countdown:
   lobby:
     enabled: true
-    duration: 10
+    durationBare: 60
+    durationOptimal: 10
     sound: true
   beforeFight:
     enabled: true

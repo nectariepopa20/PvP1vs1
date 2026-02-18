@@ -1,6 +1,3 @@
-broadcaster:
-  enabled: true
-  delay: 40
 arenaSignUpdater:
   delay: 20
 prefix: '&4[&6&l1vs1&4]&r '
