@@ -57,6 +57,8 @@ public class GameManager {
     private TimeOut timeOut = null;
     private arenaMode arenaStatus = arenaMode.NORMAL;
     private String arenaName;
+    private String currentQueueName;
+    private volatile int lobbyCountdownRemaining = -1;
     private boolean isEnabled = true;
     private int totalRounds = 3;
     private Player[] arenaPlayers = new Player[2];
@@ -281,6 +283,7 @@ public class GameManager {
             p.addPotionEffects(values.getPotionEffects());
             p.teleport(values.getLoc(), PlayerTeleportEvent.TeleportCause.PLUGIN);
             this.valueContMap.remove(name);
+            if (this.pl.getScoreboardManager() != null) this.pl.getScoreboardManager().clear(p);
         }
     }
 
@@ -454,12 +457,30 @@ public class GameManager {
         return false;
     }
 
+    public void setCurrentQueueName(String queueName) {
+        this.currentQueueName = queueName;
+    }
+
+    public String getCurrentQueueName() {
+        return this.currentQueueName;
+    }
+
+    public void setLobbyCountdownRemaining(int seconds) {
+        this.lobbyCountdownRemaining = seconds;
+    }
+
+    public int getLobbyCountdownRemaining() {
+        return this.lobbyCountdownRemaining;
+    }
+
     public void reset() {
         this.arenaStatus = this.lobbyPlayers.isEmpty() ? arenaMode.NORMAL : arenaMode.LOBBY;
         this.timeOut.resetTimeOut();
         this.arenaPlayers = new Player[2];
         this.playerRoundWins = new int[2];
         this.postGameLoser = null;
+        this.currentQueueName = null;
+        this.lobbyCountdownRemaining = -1;
         if (this.winningTimerTaskId >= 0) {
             Bukkit.getScheduler().cancelTask(this.winningTimerTaskId);
             this.winningTimerTaskId = -1;
@@ -646,6 +667,10 @@ public class GameManager {
 
     public void cancelTimeOut() {
         this.timeOut.cancelTimeOut();
+    }
+
+    public int getTimeOut() {
+        return this.timeOut != null ? this.timeOut.getTimeOut() : 0;
     }
 
     public static enum arenaMode {

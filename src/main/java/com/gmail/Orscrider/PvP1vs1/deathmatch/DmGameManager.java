@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Manages a single deathmatch arena: lobby, countdown, spawns, and fight.
@@ -49,6 +50,7 @@ public class DmGameManager {
     private final Map<String, Integer> killCounts = new HashMap<>();
     private final Map<String, ValueContainer> valueContMap = new HashMap<>();
     private DmArenaMode arenaStatus = DmArenaMode.NORMAL;
+    private String currentQueueName;
     private boolean enabled = true;
     private DmTimeOut dmTimeOut;
     private int winningTimerTaskId = -1;
@@ -466,6 +468,7 @@ public class DmGameManager {
         spectators.remove(p);
         restorePlayer(p);
         resetPlayerListName(p);
+        if (pl.getScoreboardManager() != null) pl.getScoreboardManager().clear(p);
     }
 
     public void removeSpectatorOnQuit(Player p) {
@@ -573,11 +576,35 @@ public class DmGameManager {
         p.teleport(values.getLoc(), PlayerTeleportEvent.TeleportCause.PLUGIN);
         valueContMap.remove(name);
         resetPlayerListName(p);
+        if (pl.getScoreboardManager() != null) pl.getScoreboardManager().clear(p);
+    }
+
+    public void setCurrentQueueName(String queueName) {
+        this.currentQueueName = queueName;
+    }
+
+    public String getCurrentQueueName() {
+        return currentQueueName;
+    }
+
+    public int getKills(Player p) {
+        return killCounts.getOrDefault(p.getName(), 0);
+    }
+
+    /**
+     * Top killers (name -> kills), up to 3, sorted by kills descending.
+     */
+    public List<Map.Entry<String, Integer>> getTopKillers(int max) {
+        return killCounts.entrySet().stream()
+                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
+                .limit(max)
+                .collect(Collectors.toList());
     }
 
     public void reset() {
         cancelLobbyCountdown();
         arenaStatus = lobbyPlayers.isEmpty() ? DmArenaMode.NORMAL : DmArenaMode.LOBBY;
+        currentQueueName = null;
         dmTimeOut.resetTimeOut();
         arenaPlayers.clear();
         spectators.clear();
@@ -631,6 +658,10 @@ public class DmGameManager {
 
     public void cancelTimeOut() {
         dmTimeOut.cancelTimeOut();
+    }
+
+    public int getLobbyCountdownRemaining() {
+        return lobbyCountdownRemaining.get();
     }
 
     public int getTimeOut() {

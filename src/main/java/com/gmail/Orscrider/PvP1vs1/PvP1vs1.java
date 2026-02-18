@@ -27,6 +27,7 @@ import com.gmail.Orscrider.PvP1vs1.metrics.MetricsHandler;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBConnectionController;
 import com.gmail.Orscrider.PvP1vs1.persistence.DBMigrationHandler;
 import com.gmail.Orscrider.PvP1vs1.placeholders.PvP1vs1Placeholders;
+import com.gmail.Orscrider.PvP1vs1.scoreboard.ScoreboardManager;
 import com.gmail.Orscrider.PvP1vs1.signs.SignManager;
 import com.gmail.Orscrider.PvP1vs1.util.LogHandler;
 import com.gmail.Orscrider.PvP1vs1.util.TitleHelper;
@@ -34,6 +35,7 @@ import com.gmail.Orscrider.PvP1vs1.util.Updater;
 import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -59,7 +61,30 @@ extends JavaPlugin {
     private DmArenaManager dmArenaManager;
     private DmListeners dmListeners;
     private DmCommandHandler dmCommandHandler;
+    private ScoreboardManager scoreboardManager;
+    private int scoreboardTaskId = -1;
+    private final Map<UUID, String> pending1v1QueueName = new HashMap<>();
+    private final Map<UUID, String> pendingDmQueueName = new HashMap<>();
     public static Economy economy = null;
+
+    public void setPending1v1QueueName(Player p, String queueName) {
+        if (p != null) pending1v1QueueName.put(p.getUniqueId(), queueName);
+    }
+    public String getPending1v1QueueName(Player p) {
+        return p != null ? pending1v1QueueName.get(p.getUniqueId()) : null;
+    }
+    public void clearPending1v1QueueName(Player p) {
+        if (p != null) pending1v1QueueName.remove(p.getUniqueId());
+    }
+    public void setPendingDmQueueName(Player p, String queueName) {
+        if (p != null) pendingDmQueueName.put(p.getUniqueId(), queueName);
+    }
+    public String getPendingDmQueueName(Player p) {
+        return p != null ? pendingDmQueueName.get(p.getUniqueId()) : null;
+    }
+    public void clearPendingDmQueueName(Player p) {
+        if (p != null) pendingDmQueueName.remove(p.getUniqueId());
+    }
 
     public void onEnable() {
         LogHandler.init((Plugin)this);
@@ -89,6 +114,10 @@ extends JavaPlugin {
             new PvP1vs1Placeholders(this).register();
             LogHandler.info("PlaceholderAPI expansion registered.");
         }
+        this.scoreboardManager = new ScoreboardManager(this);
+        this.scoreboardTaskId = this.getServer().getScheduler().scheduleSyncRepeatingTask((Plugin) this, () -> {
+            if (this.scoreboardManager != null) this.scoreboardManager.updateAll();
+        }, 40L, 20L);
         LogHandler.info("1vs1 enabled!");
     }
 
@@ -133,6 +162,13 @@ extends JavaPlugin {
                     }
                 }
             }
+        }
+        if (this.scoreboardTaskId >= 0) {
+            this.getServer().getScheduler().cancelTask(this.scoreboardTaskId);
+            this.scoreboardTaskId = -1;
+        }
+        if (this.scoreboardManager != null) {
+            this.scoreboardManager.clearAll();
         }
         this.dbController.disconnect();
         LogHandler.info("1vs1 disabled!");
@@ -276,6 +312,10 @@ extends JavaPlugin {
 
     public DmArenaManager getDmArenaManager() {
         return this.dmArenaManager;
+    }
+
+    public ScoreboardManager getScoreboardManager() {
+        return this.scoreboardManager;
     }
 
     public String getFilePath() {

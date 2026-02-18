@@ -659,6 +659,11 @@ implements CommandExecutor {
                         return true;
                     }
                     arena5.joinLobby(p);
+                    String pendingQueue = this.pl.getPending1v1QueueName(p);
+                    if (pendingQueue != null) {
+                        arena5.setCurrentQueueName(pendingQueue);
+                        this.pl.clearPending1v1QueueName(p);
+                    }
                     arena5.broadcastPlayerJoinedLobby(p);
                     this.replacements.put("{ARENA}", arena5.getArenaName());
                     this.pl.send1vs1Message("joinLobby", p, this.replacements);
@@ -871,6 +876,7 @@ implements CommandExecutor {
                 if (chosen == null || maxCount == 0) {
                     chosen = joinable.get(new Random().nextInt(joinable.size()));
                 }
+                this.pl.setPending1v1QueueName(p, queueName);
                 p.chat("/1vs1 join " + chosen);
                 return true;
             default:

@@ -45,10 +45,18 @@ extends Thread {
                 org.bukkit.configuration.file.FileConfiguration cfg = this.gameManager.getArenaConfig();
                 int duration = cfg.getInt("countdown.lobby.duration", cfg.getInt("countdown.beforeTeleport.duration", 5));
                 java.util.List<Player> lobbyList = this.gameManager.getLobbyPlayers();
-                if (lobbyList.size() < 2) break block28;
+                if (lobbyList.size() < 2) {
+                    Bukkit.getScheduler().runTask((Plugin)this.pl, () -> this.gameManager.setLobbyCountdownRemaining(-1));
+                    break block28;
+                }
                 Player[] players = new Player[]{lobbyList.get(0), lobbyList.get(1)};
                 for (int i = duration; i >= 0 && this.gameManager.isEnabled(); --i) {
-                    if (this.gameManager.getLobbyPlayers().size() < 2) break;
+                    if (this.gameManager.getLobbyPlayers().size() < 2) {
+                        Bukkit.getScheduler().runTask((Plugin)this.pl, () -> this.gameManager.setLobbyCountdownRemaining(-1));
+                        break;
+                    }
+                    final int remaining = i;
+                    Bukkit.getScheduler().runTask((Plugin)this.pl, () -> this.gameManager.setLobbyCountdownRemaining(remaining));
                     this.replacements.put("{COUNTDOWN}", String.valueOf(i));
                     if (i == duration) {
                         for (Player p : players) {
@@ -77,10 +85,12 @@ extends Thread {
                                 }
                             }
                             this.joinArena(players);
+                            Bukkit.getScheduler().runTask((Plugin)this.pl, () -> this.gameManager.setLobbyCountdownRemaining(-1));
                             break;
                     }
                     try { Thread.sleep(1000L); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
+                Bukkit.getScheduler().runTask((Plugin)this.pl, () -> this.gameManager.setLobbyCountdownRemaining(-1));
                 break block28;
             }
             if (this.countdownMode != countdownType.BEFORE_FIGHT) break block28;

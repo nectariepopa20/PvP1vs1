@@ -144,6 +144,11 @@ public class DmCommandHandler implements CommandExecutor {
             return true;
         }
         arena.joinLobby(p);
+        String pendingQueue = pl.getPendingDmQueueName(p);
+        if (pendingQueue != null) {
+            arena.setCurrentQueueName(pendingQueue);
+            pl.clearPendingDmQueueName(p);
+        }
         arena.broadcastPlayerJoinedLobby(p);
         replacements.put("{ARENA}", arena.getArenaName());
         pl.sendDmMessage("joinLobby", p, replacements);
@@ -309,6 +314,7 @@ public class DmCommandHandler implements CommandExecutor {
                 if (maxCount == 0) {
                     chosen = joinable.get(new Random().nextInt(joinable.size()));
                 }
+                pl.setPendingDmQueueName(p, queueName);
                 p.chat("/dm join " + chosen);
                 return true;
             default:

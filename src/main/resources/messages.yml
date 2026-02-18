@@ -96,3 +96,42 @@ arenaModes:
   winningTimer: '&6Winning'
 sign:
   inLobby: 'in lobby'
+
+# Scoreboard (1v1) - title and lines; number of lines = number of list entries. Use & for colors. PlaceholderAPI supported.
+# Placeholders: {arena_name}, {queue_name}, {player_count}, {status}, {countdown}, {opponent_name}, {opponent_health},
+#   {time_left}, {round_current}, {round_total}, {game_type}, {round_winner}, {winner_health}, {next_round_in}, {game_winner}, {game_loser}
+scoreboard:
+  enabled: true
+  lobby:
+    title: '&6&l1v1 Lobby'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&7Players: &f{player_count}'
+      - '&7Status: &f{status}'
+      - '&7Starting in: &f{countdown}'
+  game:
+    title: '&c&l1v1 Fight'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&7Opponent: &c{opponent_name}'
+      - '&7Opponent health: &c{opponent_health}'
+      - '&7Time left: &f{time_left}s'
+      - '&7{game_type} &8- &fRound {round_current}/{round_total}'
+  endgame:
+    title: '&6&lRound Over'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&aRound winner: &f{round_winner}'
+      - '&7Health left: &f{winner_health}'
+      - '&7Next round in: &f{next_round_in}s'
+  endgameGameOver:
+    title: '&6&lGame Over'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&aWinner: &f{game_winner}'
+      - '&cLoser: &f{game_loser}'
+      - '&7Rounds: &f{round_total}'

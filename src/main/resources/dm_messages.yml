@@ -79,3 +79,39 @@ info:
 - '&aIn lobby: &6{IN_LOBBY}'
 - '&aLobby players: &6{LOBBY_PLAYERS}'
 - '&aCurrently in arena: &6{ARENA_PLAYERS}'
+
+# Scoreboard (DM) - title and lines; number of lines = number of list entries. Use & for colors. PlaceholderAPI supported.
+# Placeholders: {arena_name}, {queue_name}, {player_count}, {status}, {countdown}, {min_players}, {optimal_players},
+#   {countdown_bare}, {countdown_optimal}, {players_left}, {your_kills}, {top_killer_1}, {top_killer_2}, {top_killer_3},
+#   {top_kills_1}, {top_kills_2}, {top_kills_3}, {time_left}, {winner}
+scoreboard:
+  enabled: true
+  lobby:
+    title: '&4&lDM Lobby'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&7Players: &f{player_count}'
+      - '&7Status: &f{status}'
+      - '&7Starting in: &f{countdown}'
+  game:
+    title: '&4&lDeathmatch'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&7Players left: &f{players_left}'
+      - '&7Your kills: &c{your_kills}'
+      - '&7Time left: &f{time_left}s'
+      - '&61. &f{top_killer_1} &7({top_kills_1})'
+      - '&62. &f{top_killer_2} &7({top_kills_2})'
+      - '&63. &f{top_killer_3} &7({top_kills_3})'
+  endgame:
+    title: '&6&lDM Over'
+    lines:
+      - '&7Arena: &f{arena_name}'
+      - '&7Queue: &f{queue_name}'
+      - '&aWinner: &f{winner}'
+      - '&7Your kills: &f{your_kills}'
+      - '&61. &f{top_killer_1} &7({top_kills_1})'
+      - '&62. &f{top_killer_2} &7({top_kills_2})'
+      - '&63. &f{top_killer_3} &7({top_kills_3})'
