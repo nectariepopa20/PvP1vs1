@@ -117,7 +117,7 @@ extends JavaPlugin {
         this.scoreboardManager = new ScoreboardManager(this);
         this.scoreboardTaskId = this.getServer().getScheduler().scheduleSyncRepeatingTask((Plugin) this, () -> {
             if (this.scoreboardManager != null) this.scoreboardManager.updateAll();
-        }, 40L, 20L);
+        }, 20L, 10L);
         LogHandler.info("1vs1 enabled!");
     }
 

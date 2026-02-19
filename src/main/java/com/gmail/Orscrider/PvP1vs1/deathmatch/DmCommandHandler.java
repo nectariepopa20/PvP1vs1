@@ -175,7 +175,7 @@ public class DmCommandHandler implements CommandExecutor {
 
     private boolean handleQueue(Player p, String[] args) {
         if (args.length < 2) {
-            p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join> [args]");
+            p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join|setscoreboardname> [args]");
             return true;
         }
         String sub = args[1].toLowerCase();
@@ -317,8 +317,25 @@ public class DmCommandHandler implements CommandExecutor {
                 pl.setPendingDmQueueName(p, queueName);
                 p.chat("/dm join " + chosen);
                 return true;
+            case "setscoreboardname":
+                if (!p.hasPermission("dm.queue.setscoreboardname")) {
+                    pl.messageParserDm("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length < 4) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue setscoreboardname <queue> <name>");
+                    return true;
+                }
+                if (!pl.getDataHandler().queueExists("dm", args[2])) {
+                    p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                    return true;
+                }
+                String displayNameDm = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                pl.getDataHandler().setQueueScoreboardName("dm", args[2], displayNameDm);
+                p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.GREEN + "Scoreboard name for queue \"" + args[2] + "\" set to \"" + displayNameDm + "\".");
+                return true;
             default:
-                p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join> [args]");
+                p.sendMessage(pl.getDataHandler().getDmPrefix() + ChatColor.RED + "/dm queue <create|delete|addarena|remarena|list|join|setscoreboardname> [args]");
                 return true;
         }
     }

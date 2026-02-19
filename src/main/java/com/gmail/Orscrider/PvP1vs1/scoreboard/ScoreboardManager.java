@@ -10,14 +10,17 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Manages scoreboard display for 1v1 and DM lobby, game, and endgame.
  * Lines and title are read from messages config; placeholders are replaced and PlaceholderAPI applied.
  * Score numbers are hidden when running on Paper (1.20.4+).
+ * Only updates when content actually changes to prevent flicker.
  */
 public class ScoreboardManager {
 
@@ -27,6 +30,11 @@ public class ScoreboardManager {
 
     private final PvP1vs1 pl;
     private final Map<Player, Scoreboard> playerScoreboards = new HashMap<>();
+    /** Cache of last displayed content per player to avoid redundant updates (flicker). Key: player UUID. */
+    private final Map<UUID, CachedScoreboard> cache = new HashMap<>();
+    private static volatile boolean paperNumberFormatTried = false;
+    private static volatile Class<?> paperNumberFormatClass = null;
+    private static volatile Object paperBlankNumberFormat = null;
 
     public ScoreboardManager(PvP1vs1 plugin) {
         this.pl = plugin;
@@ -76,13 +84,28 @@ public class ScoreboardManager {
 
     /**
      * Build and show scoreboard with title and lines. Lines are replaced with placeholders and PAPI.
+     * Only applies updates when title or line content has changed to prevent flicker.
      */
     public void show(Player player, String title, List<String> lines, Map<String, String> placeholders) {
         if (player == null || !player.isOnline()) return;
         if (lines == null || lines.isEmpty()) {
             clear(player);
+            cache.remove(player.getUniqueId());
             return;
         }
+        List<String> resolvedLines = new ArrayList<>();
+        for (int i = 0; i < Math.min(MAX_LINES, lines.size()); i++) {
+            resolvedLines.add(replace(player, lines.get(i), placeholders));
+        }
+        String displayTitle = replace(player, title, placeholders);
+        if (displayTitle.length() > 32) displayTitle = displayTitle.substring(0, 32);
+
+        CachedScoreboard prev = cache.get(player.getUniqueId());
+        if (prev != null && prev.title.equals(displayTitle) && prev.lines.equals(resolvedLines)) {
+            return;
+        }
+        cache.put(player.getUniqueId(), new CachedScoreboard(displayTitle, resolvedLines));
+
         Scoreboard board = player.getScoreboard();
         if (board == pl.getServer().getScoreboardManager().getMainScoreboard()) {
             board = pl.getServer().getScoreboardManager().getNewScoreboard();
@@ -90,37 +113,49 @@ public class ScoreboardManager {
         }
         playerScoreboards.put(player, board);
 
-        String displayTitle = replace(player, title, placeholders);
-        if (displayTitle.length() > 32) displayTitle = displayTitle.substring(0, 32);
-
         Objective obj = board.getObjective("pvp1v1");
-        if (obj == null) obj = board.registerNewObjective("pvp1v1", "dummy", displayTitle);
-        obj.setDisplayName(displayTitle);
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        tryHideScoreNumbers(obj);
+        if (obj == null) {
+            obj = board.registerNewObjective("pvp1v1", "dummy", displayTitle);
+            obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+            tryHideScoreNumbers(obj);
+        } else if (!obj.getDisplayName().equals(displayTitle)) {
+            obj.setDisplayName(displayTitle);
+        }
 
-        int size = Math.min(MAX_LINES, lines.size());
+        int size = resolvedLines.size();
         for (int i = 0; i < size; i++) {
-            String line = replace(player, lines.get(i), placeholders);
+            String line = resolvedLines.get(i);
             String entry = getUniqueEntry(i);
             Team team = board.getTeam("line" + i);
             if (team == null) team = board.registerNewTeam("line" + i);
-            team.removeEntry(entry);
-            if (line.length() <= MAX_PREFIX) {
-                team.setPrefix(line);
-                team.setSuffix("");
-            } else {
-                team.setPrefix(line.substring(0, MAX_PREFIX));
-                team.setSuffix(line.length() <= MAX_PREFIX + MAX_SUFFIX ? line.substring(MAX_PREFIX) : line.substring(MAX_PREFIX, MAX_PREFIX + MAX_SUFFIX));
+            if (!team.hasEntry(entry)) team.addEntry(entry);
+            String prefix = line.length() <= MAX_PREFIX ? line : line.substring(0, MAX_PREFIX);
+            String suffix = line.length() <= MAX_PREFIX ? "" : (line.length() <= MAX_PREFIX + MAX_SUFFIX ? line.substring(MAX_PREFIX) : line.substring(MAX_PREFIX, MAX_PREFIX + MAX_SUFFIX));
+            if (!prefix.equals(team.getPrefix()) || !suffix.equals(team.getSuffix())) {
+                team.setPrefix(prefix);
+                team.setSuffix(suffix);
             }
-            team.addEntry(entry);
-            obj.getScore(entry).setScore(size - 1 - i);
+            int score = size - i;
+            if (obj.getScore(entry).getScore() != score) {
+                obj.getScore(entry).setScore(score);
+            }
         }
         for (int i = size; i < MAX_LINES; i++) {
             String entry = getUniqueEntry(i);
             Team team = board.getTeam("line" + i);
-            if (team != null) team.removeEntry(entry);
-            board.resetScores(entry);
+            if (team != null && team.hasEntry(entry)) {
+                team.removeEntry(entry);
+                board.resetScores(entry);
+            }
+        }
+    }
+
+    private static final class CachedScoreboard {
+        final String title;
+        final List<String> lines;
+        CachedScoreboard(String title, List<String> lines) {
+            this.title = title;
+            this.lines = new ArrayList<>(lines);
         }
     }
 
@@ -130,12 +165,31 @@ public class ScoreboardManager {
     }
 
     private void tryHideScoreNumbers(Objective objective) {
-        try {
-            Class<?> numberFormatClass = Class.forName("io.papermc.paper.scoreboard.numbers.NumberFormat");
-            Object blank = numberFormatClass.getMethod("blank").invoke(null);
-            objective.getClass().getMethod("numberFormat", numberFormatClass).invoke(objective, blank);
-        } catch (Throwable ignored) {
-            // Paper API not available (Spigot); score numbers remain visible
+        if (paperBlankNumberFormat != null && paperNumberFormatClass != null) {
+            try {
+                objective.getClass().getMethod("numberFormat", paperNumberFormatClass).invoke(objective, paperBlankNumberFormat);
+            } catch (Throwable ignored) {}
+            return;
+        }
+        if (paperNumberFormatTried) return;
+        paperNumberFormatTried = true;
+        ClassLoader[] loaders = {
+            objective.getClass().getClassLoader(),
+            org.bukkit.Bukkit.class.getClassLoader(),
+            Thread.currentThread().getContextClassLoader()
+        };
+        for (ClassLoader loader : loaders) {
+            if (loader == null) continue;
+            try {
+                Class<?> numberFormatClass = Class.forName("io.papermc.paper.scoreboard.numbers.NumberFormat", false, loader);
+                Object blank = numberFormatClass.getMethod("blank").invoke(null);
+                if (blank != null) {
+                    objective.getClass().getMethod("numberFormat", numberFormatClass).invoke(objective, blank);
+                    ScoreboardManager.paperNumberFormatClass = numberFormatClass;
+                    ScoreboardManager.paperBlankNumberFormat = blank;
+                    return;
+                }
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -144,6 +198,7 @@ public class ScoreboardManager {
      */
     public void clear(Player player) {
         if (player == null || !player.isOnline()) return;
+        cache.remove(player.getUniqueId());
         Scoreboard board = player.getScoreboard();
         Objective obj = board.getObjective(DisplaySlot.SIDEBAR);
         if (obj != null && "pvp1v1".equals(obj.getName())) obj.unregister();
@@ -168,7 +223,8 @@ public class ScoreboardManager {
         for (Map.Entry<String, GameManager> e : pl.getArenaManager().getArenas().entrySet()) {
             GameManager gm = e.getValue();
             String arenaName = e.getKey();
-            String queueName = gm.getCurrentQueueName() != null ? gm.getCurrentQueueName() : "-";
+            String queueKey = gm.getCurrentQueueName();
+            String queueName = resolveQueueDisplayName("1v1", queueKey);
 
             for (Player p : gm.getLobbyPlayers()) {
                 if (p == null || !p.isOnline()) continue;
@@ -178,10 +234,12 @@ public class ScoreboardManager {
                 map.put("{player_count}", gm.getLobbySize() + "/2");
                 int rem = gm.getLobbyCountdownRemaining();
                 if (gm.getArenaStatus() == GameManager.arenaMode.COUNTDOWN_LOBBY && rem >= 0) {
-                    map.put("{status}", "Starting in " + rem + "s");
+                    String statusMsg = pl.getDataHandler().getMessagesConfig().getString("scoreboard.statusStartingIn", "&7Starting in &f{countdown}&7s").replace("{countdown}", String.valueOf(rem));
+                    map.put("{status}", statusMsg);
                     map.put("{countdown}", String.valueOf(rem));
                 } else {
-                    map.put("{status}", "Waiting for players");
+                    String statusMsg = pl.getDataHandler().getMessagesConfig().getString("scoreboard.statusWaiting", "&7Waiting for players");
+                    map.put("{status}", statusMsg);
                     map.put("{countdown}", "-");
                 }
                 show1v1(p, "scoreboard.lobby", map);
@@ -194,7 +252,7 @@ public class ScoreboardManager {
                     Player opp = p == arenaPlayers[0] ? arenaPlayers[1] : arenaPlayers[0];
                     Map<String, String> map = new HashMap<>();
                     map.put("{arena_name}", arenaName);
-                    map.put("{queue_name}", queueName);
+                    map.put("{queue_name}", resolveQueueDisplayName("1v1", gm.getCurrentQueueName()));
                     map.put("{opponent_name}", opp != null && opp.isOnline() ? opp.getName() : "-");
                     map.put("{opponent_health}", opp != null && opp.isOnline() ? String.valueOf(Math.max(0, (int) opp.getHealth())) : "0");
                     map.put("{time_left}", String.valueOf(gm.getTimeOut()));
@@ -208,7 +266,7 @@ public class ScoreboardManager {
                     Player winner = gm.getPlayerRoundWins(arenaPlayers[0]) > gm.getPlayerRoundWins(arenaPlayers[1]) ? arenaPlayers[0] : arenaPlayers[1];
                     Map<String, String> map = new HashMap<>();
                     map.put("{arena_name}", arenaName);
-                    map.put("{queue_name}", queueName);
+                    map.put("{queue_name}", resolveQueueDisplayName("1v1", gm.getCurrentQueueName()));
                     map.put("{round_winner}", winner != null ? winner.getName() : "-");
                     map.put("{winner_health}", winner != null && winner.isOnline() ? String.valueOf((int) winner.getHealth()) : "0");
                     map.put("{next_round_in}", String.valueOf(gm.getArenaConfig().getInt("winningTimer", 10)));
@@ -218,7 +276,7 @@ public class ScoreboardManager {
                     Player loser = gm.getPostGameLoser();
                     Map<String, String> map = new HashMap<>();
                     map.put("{arena_name}", arenaName);
-                    map.put("{queue_name}", queueName);
+                    map.put("{queue_name}", resolveQueueDisplayName("1v1", gm.getCurrentQueueName()));
                     map.put("{game_winner}", winner != null ? winner.getName() : "-");
                     map.put("{game_loser}", loser != null ? loser.getName() : "-");
                     map.put("{round_total}", String.valueOf(gm.getTotalRounds()));
@@ -230,7 +288,7 @@ public class ScoreboardManager {
         for (Map.Entry<String, DmGameManager> e : pl.getDmArenaManager().getArenas().entrySet()) {
             DmGameManager dm = e.getValue();
             String arenaName = e.getKey();
-            String queueName = dm.getCurrentQueueName() != null ? dm.getCurrentQueueName() : "-";
+            String queueName = resolveQueueDisplayName("dm", dm.getCurrentQueueName());
 
             for (Player p : dm.getLobbyPlayers()) {
                 if (p == null || !p.isOnline()) continue;
@@ -245,13 +303,16 @@ public class ScoreboardManager {
                 int rem = dm.getLobbyCountdownRemaining();
                 if (dm.getArenaStatus() == DmGameManager.DmArenaMode.COUNTDOWN_LOBBY && rem >= 0) {
                     if (dm.getLobbySize() >= dm.getOptimalMinimumPlayers()) {
-                        map.put("{status}", "Optimal: starting in " + rem + "s");
+                        String statusMsg = pl.getDataHandler().getDmMessagesConfig().getString("scoreboard.statusOptimalStartingIn", "&7Optimal: starting in &f{countdown}&7s").replace("{countdown}", String.valueOf(rem));
+                        map.put("{status}", statusMsg);
                     } else {
-                        map.put("{status}", "Minimum: starting in " + rem + "s");
+                        String statusMsg = pl.getDataHandler().getDmMessagesConfig().getString("scoreboard.statusMinimumStartingIn", "&7Minimum: starting in &f{countdown}&7s").replace("{countdown}", String.valueOf(rem));
+                        map.put("{status}", statusMsg);
                     }
                     map.put("{countdown}", String.valueOf(rem));
                 } else {
-                    map.put("{status}", "Waiting for players");
+                    String statusMsg = pl.getDataHandler().getDmMessagesConfig().getString("scoreboard.statusWaiting", "&7Waiting for players");
+                    map.put("{status}", statusMsg);
                     map.put("{countdown}", "-");
                 }
                 showDm(p, "scoreboard.lobby", map);
@@ -274,6 +335,12 @@ public class ScoreboardManager {
                 }
             }
         }
+    }
+
+    private String resolveQueueDisplayName(String gamemode, String queueKey) {
+        if (queueKey == null || queueKey.isEmpty()) return "-";
+        String display = pl.getDataHandler().getQueueScoreboardName(gamemode, queueKey);
+        return display != null ? display : queueKey;
     }
 
     private Map<String, String> buildDmGameMap(DmGameManager dm, String arenaName, String queueName, Player viewer) {

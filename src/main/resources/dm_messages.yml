@@ -84,8 +84,12 @@ info:
 # Placeholders: {arena_name}, {queue_name}, {player_count}, {status}, {countdown}, {min_players}, {optimal_players},
 #   {countdown_bare}, {countdown_optimal}, {players_left}, {your_kills}, {top_killer_1}, {top_killer_2}, {top_killer_3},
 #   {top_kills_1}, {top_kills_2}, {top_kills_3}, {time_left}, {winner}
+# Status messages (use {countdown} for the number when starting):
 scoreboard:
   enabled: true
+  statusWaiting: '&7Waiting for players'
+  statusMinimumStartingIn: '&7Minimum: starting in &f{countdown}&7s'
+  statusOptimalStartingIn: '&7Optimal: starting in &f{countdown}&7s'
   lobby:
     title: '&4&lDM Lobby'
     lines:

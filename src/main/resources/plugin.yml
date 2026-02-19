@@ -54,6 +54,7 @@ permissions:
       1vs1.queue.remarena: true
       1vs1.queue.list: true
       1vs1.queue.join: true
+      1vs1.queue.setscoreboardname: true
       1vs1.queueSign.create: true
       1vs1.duel: true
       1vs1.duel.arena: true
@@ -122,6 +123,7 @@ permissions:
       dm.queue.remarena: true
       dm.queue.list: true
       dm.queue.join: true
+      dm.queue.setscoreboardname: true
       dm.queueSign.create: true
       dm.forcestart: true
       dm.teleport: true

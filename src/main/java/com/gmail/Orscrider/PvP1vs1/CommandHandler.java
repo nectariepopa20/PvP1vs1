@@ -81,7 +81,7 @@ implements CommandExecutor {
                                         this.wrongCommandUsage(p);
                                         return true;
                                     }
-                                    if (args.length > 4 && !(args[0].equalsIgnoreCase("queue") && args.length <= 5)) {
+                                    if (args.length > 4 && !args[0].equalsIgnoreCase("queue")) {
                                         this.wrongCommandUsage(p);
                                         return true;
                                     }
@@ -732,7 +732,7 @@ implements CommandExecutor {
 
     private boolean handle1v1Queue(Player p, String[] args) {
         if (args.length < 2) {
-            p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join> [args]");
+            p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join|setscoreboardname> [args]");
             return true;
         }
         String sub = args[1].toLowerCase();
@@ -879,8 +879,25 @@ implements CommandExecutor {
                 this.pl.setPending1v1QueueName(p, queueName);
                 p.chat("/1vs1 join " + chosen);
                 return true;
+            case "setscoreboardname":
+                if (!p.hasPermission("1vs1.queue.setscoreboardname")) {
+                    this.pl.messageParser("insufficientPermission", p);
+                    return true;
+                }
+                if (args.length < 4) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue setscoreboardname <queue> <name>");
+                    return true;
+                }
+                if (!this.pl.getDataHandler().queueExists("1v1", args[2])) {
+                    p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "Queue \"" + args[2] + "\" does not exist.");
+                    return true;
+                }
+                String displayName1v1 = String.join(" ", java.util.Arrays.copyOfRange(args, 3, args.length));
+                this.pl.getDataHandler().setQueueScoreboardName("1v1", args[2], displayName1v1);
+                p.sendMessage(this.pl.getPrefix() + ChatColor.GREEN + "Scoreboard name for queue \"" + args[2] + "\" set to \"" + displayName1v1 + "\".");
+                return true;
             default:
-                p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join> [args]");
+                p.sendMessage(this.pl.getPrefix() + ChatColor.RED + "/1v1 queue <create|delete|addarena|remarena|list|join|setscoreboardname> [args]");
                 return true;
         }
     }

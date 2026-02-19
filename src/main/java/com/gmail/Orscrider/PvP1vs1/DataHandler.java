@@ -103,7 +103,20 @@ public class DataHandler {
         this.queuesConfig = YamlConfiguration.loadConfiguration(this.queuesConfigFile);
         if (!this.queuesConfig.contains("1v1")) this.queuesConfig.createSection("1v1");
         if (!this.queuesConfig.contains("dm")) this.queuesConfig.createSection("dm");
+        if (!this.queuesConfig.contains("1v1_scoreboard_names")) this.queuesConfig.createSection("1v1_scoreboard_names");
+        if (!this.queuesConfig.contains("dm_scoreboard_names")) this.queuesConfig.createSection("dm_scoreboard_names");
         this.saveQueuesConfig();
+    }
+
+    /** Display name for queue on scoreboard; null = use queue name. */
+    public String getQueueScoreboardName(String gamemode, String queueName) {
+        String path = gamemode + "_scoreboard_names." + queueName;
+        return getQueuesConfig().getString(path);
+    }
+
+    public void setQueueScoreboardName(String gamemode, String queueName, String displayName) {
+        getQueuesConfig().set(gamemode + "_scoreboard_names." + queueName, displayName != null && !displayName.isEmpty() ? displayName : null);
+        saveQueuesConfig();
     }
 
     public void saveQueuesConfig() {
@@ -140,6 +153,7 @@ public class DataHandler {
     public boolean deleteQueue(String gamemode, String queueName) {
         if (!queueExists(gamemode, queueName)) return false;
         getQueuesConfig().set(gamemode + "." + queueName, null);
+        getQueuesConfig().set(gamemode + "_scoreboard_names." + queueName, null);
         saveQueuesConfig();
         return true;
     }

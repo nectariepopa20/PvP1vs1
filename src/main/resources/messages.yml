@@ -100,8 +100,11 @@ sign:
 # Scoreboard (1v1) - title and lines; number of lines = number of list entries. Use & for colors. PlaceholderAPI supported.
 # Placeholders: {arena_name}, {queue_name}, {player_count}, {status}, {countdown}, {opponent_name}, {opponent_health},
 #   {time_left}, {round_current}, {round_total}, {game_type}, {round_winner}, {winner_health}, {next_round_in}, {game_winner}, {game_loser}
+# Status messages (use {countdown} for the number when starting):
 scoreboard:
   enabled: true
+  statusWaiting: '&7Waiting for players'
+  statusStartingIn: '&7Starting in &f{countdown}&7s'
   lobby:
     title: '&6&l1v1 Lobby'
     lines:
